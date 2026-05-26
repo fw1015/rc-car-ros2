@@ -4,7 +4,7 @@
     <title>RC Car Control</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     
-    <!-- Full screen for iPhone Safari -->
+    <!-- iOS Full Screen Support -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
@@ -13,6 +13,8 @@
 </head>
 <body>
     <div class="container">
+
+        <!-- Live Camera Feed -->
         <div class="camera-container">
            <img id="camera-feed" 
                 src="http://192.168.0.30:5000/camera_stream" 
@@ -46,7 +48,7 @@
                 <button class="dir-btn" data-dir="right">▶</button>
             </div>
 
-            <!-- Thrust -->
+            <!-- Thrust Button -->
             <button class="thrust-btn" data-thrust="forward">🚀</button>
         </div>
 

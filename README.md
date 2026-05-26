@@ -24,12 +24,20 @@ An autonomous RC car built with **ROS 2 Jazzy**, **Raspberry Pi 5**, and a web-b
 - **SolidWorks** (3D design)
 
 ## Project Structure
-src/
-├── web_interface/          # Flask web server + frontend
-├── robot_brain/            # Decision making node
-├── robot_movement/         # Servo and ESC control
-├── robot_sensors/          # ToF + Ultrasonic sensors
-└── camera_ros/             # Camera node for live feed
+```bash
+rc-car-ros2/
+├── src/
+│   ├── web_interface/            # Flask web server + frontend
+│   ├── robot_brain/              # Decision making & sensor fusion
+│   ├── robot_movement/           # Servo and ESC control nodes
+│   ├── robot_sensors/            # ToF + Ultrasonic sensor nodes
+│   └── camera_ros/               # Camera streaming node
+├── docs/                         # Documentation
+│   └── hardware_architecture.md  # Hardware mapping and pin connections
+├── hardware/
+│   └── 3d_models/                # STL files for 3D printed parts
+├── .gitignore
+└── README.md
 
 ## How to Run
 ```bash

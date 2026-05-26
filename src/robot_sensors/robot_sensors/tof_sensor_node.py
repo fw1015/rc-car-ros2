@@ -12,6 +12,7 @@ class TofSensorPublisher(Node):
     This node reads distance data from the front-facing ToF sensor
     and publishes the minimum reliable distance as a Float64 message.
     """
+    
     def __init__(self):
         super().__init__('tof_sensor_node')
 
@@ -94,7 +95,7 @@ class TofSensorPublisher(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = TofSensorPublisher()
-    
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

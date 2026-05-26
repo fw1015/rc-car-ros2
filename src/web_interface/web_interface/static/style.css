@@ -1,51 +1,41 @@
+/* ==================== RESET & BASE ==================== */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
     user-select: none;
-    touch-action: none !important;
-    -webkit-touch-callout: none;
     -webkit-user-select: none;
-    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
 }
 
-body {
+html, body {
+    height: 100%;
+    overflow: hidden;
     background: #000;
     color: white;
     font-family: Arial, sans-serif;
-    overflow: hidden;
-    height: 100%;
-    margin: 0;
-    padding: 0;
 }
 
-html {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-}
-
+/* ==================== MAIN LAYOUT ==================== */
 .container {
     position: relative;
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    background: #000;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Live Camera - Full Background */
+/* ==================== CAMERA ==================== */
 .camera-container {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
-    height: 100vh;
+    height: 100%;
     z-index: 1;
     background: #000;
-    touch-action: none;
     pointer-events: none;
 }
 
@@ -56,7 +46,7 @@ html {
     display: block;
 }
 
-/* Top Sensor Overlay */
+/* ==================== SENSOR OVERLAY ==================== */
 .sensor-overlay {
     position: absolute;
     top: 10px;
@@ -89,25 +79,17 @@ html {
     opacity: 0.8;
 }
 
-/* Bottom Controls */
+/* ==================== BOTTOM CONTROLS ==================== */
 .bottom-controls {
-    z-index: 20;                   /* Higher than camera */
     position: absolute;
-    bottom: 75px;
+    bottom: calc(75px + env(safe-area-inset-bottom));
     left: 0;
     right: 0;
     display: flex;
     justify-content: space-between;
     padding: 0 30px;
+    z-index: 20;
     pointer-events: auto;
-    bottom: calc(20px + env(safe-area-inset-bottom));
-    touch-action: none;
-}
-
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .bottom-controls {
-        bottom: calc(75px + env(safe-area-inset-bottom));
-    }
 }
 
 .steering-controls {
@@ -115,14 +97,21 @@ html {
     gap: 15px;
 }
 
+/* ==================== BUTTONS ==================== */
+.dir-btn, .thrust-btn {
+    border: none;
+    border-radius: 50%;
+    color: white;
+    z-index: 30;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+}
+
 .dir-btn {
     width: 70px;
     height: 70px;
     font-size: 32px;
-    background: rgba(255,255,255,0.15);
-    border: none;
-    border-radius: 50%;
-    color: white;
+    background: rgba(255, 255, 255, 0.15);
 }
 
 .thrust-btn {
@@ -131,29 +120,12 @@ html {
     font-size: 36px;
     background: #00ff88;
     color: #000;
-    border: none;
-    border-radius: 50%;
 }
 
-/* Status */
+/* ==================== STATUS ==================== */
 .status-card {
     position: absolute;
     top: 15px;
     right: 15px;
     z-index: 20;
-}
-
-body, .container, .camera-container, .bottom-controls {
-    touch-action: none;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-}
-
-.dir-btn, .thrust-btn {
-    touch-action: none;
-    z-index: 30;
-    pointer-events: auto;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
 }

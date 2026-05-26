@@ -1,4 +1,8 @@
-// === Visible Debug Panel (shows real-time status on phone) ===
+// ================================================
+// RC Car Web Interface - Frontend JavaScript
+// ================================================
+
+// === Visible Debug Panel (for development & testing) ===
 function createDebugPanel() {
     let debug = document.getElementById('debug-panel');
     if (!debug) {
@@ -11,6 +15,9 @@ function createDebugPanel() {
 }
 const debugPanel = createDebugPanel();
 
+/**
+ * Updates the on-screen debug panel with current control states
+ */
 function updateDebug(steering, thrust) {
     debugPanel.innerHTML = `
         Steering: <b>${steering || '—'}</b><br>
@@ -18,28 +25,13 @@ function updateDebug(steering, thrust) {
     `;
 }
 
-// === Status & Sensor ===
+// === Status Indicator ===
 function setStatus(text) {
     document.getElementById('status').textContent = text;
 }
 setStatus('Connected ✅');
 
-// === Sensor update ===
-function updateSensor() { /* same as before */ }
-setInterval(updateSensor, 250);
-
-// === Camera ===
-function initCamera() {
-    const cam = document.getElementById('camera-feed');
-    if (cam) {
-        const host = window.location.hostname;
-        cam.src = `http://${host}:8080/stream?topic=/camera_node/image_raw&type=ros_compressed`;
-        console.log(host)
-        console.log("Camera stream set to: " + cam.src)
-    }
-}
-initCamera();
-
+// === Sensor Data Polling ===
 function updateSensor() {
     fetch('/sensor_data')
         .then(response => response.json())
@@ -76,12 +68,25 @@ function updateSensor() {
             console.error("❌ Failed to fetch sensor data:", err);
         });
 }
-setInterval(updateSensor, 300);   // slightly slower polling
-updateSensor();   // run once immediately
+setInterval(updateSensor, 300);
+updateSensor();   // Initial call
+
+// === Camera Streaming (Dynamic URL) ===
+function initCamera() {
+    const cam = document.getElementById('camera-feed');
+    if (cam) {
+        const host = window.location.hostname;
+        cam.src = `http://${host}:8080/stream?topic=/camera_node/image_raw&type=ros_compressed`;
+        console.log(host)
+        console.log("Camera stream set to: " + cam.src)
+    }
+}
+initCamera();
 
 // === Command sender ===
 function sendCommand(type, value) {
     console.log(`[JS] Sending → ${type}: ${value}`);
+
     fetch('/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,11 +94,14 @@ function sendCommand(type, value) {
     });
 }
 
-// === Global Multi-Touch with visible debug ===
+// === Multi-Touch Control Logic ===
 let activeSteering = null;
 let steerInterval = null;
 let thrustActive = false;
 
+/**
+ * Handles pointer down (mouse or touch start)
+ */
 const handleDown = (e) => {
     e.preventDefault();
     const btn = e.currentTarget;
@@ -103,6 +111,8 @@ const handleDown = (e) => {
         activeSteering = dir;
         btn.classList.add('active');
         sendCommand('direction', dir);
+
+        // Repeat command while button is held
         steerInterval = setInterval(() => sendCommand('direction', dir), 80);
     } else if (btn.classList.contains('thrust-btn')) {
         thrustActive = true;
@@ -112,6 +122,9 @@ const handleDown = (e) => {
     updateDebug(activeSteering, thrustActive);
 };
 
+/**
+ * Handles pointer up / cancel (mouse or touch end)
+ */
 const handleUp = (e) => {
     e.preventDefault();
     const btn = e.currentTarget;

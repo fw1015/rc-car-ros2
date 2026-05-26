@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RC Car Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    
+    <!-- Full screen for iPhone Safari -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="camera-container">
+           <img id="camera-feed" 
+                src="http://192.168.0.30:5000/camera_stream" 
+                alt="Live Camera Feed"
+                style="width:100%; height:100%; object-fit: contain; display:block;">
+        </div>
+
+        <!-- Top Sensor Overlay -->
+        <div class="sensor-overlay">
+            <div class="sensor-panel">
+                <div class="sensor-item">
+                    <span id="front-distance" class="sensor-value">---</span>
+                    <span class="sensor-label">FRONT</span>
+                </div>
+                <div class="sensor-item">
+                    <span id="left-distance" class="sensor-value">---</span>
+                    <span class="sensor-label">LEFT</span>
+                </div>
+                <div class="sensor-item">
+                    <span id="right-distance" class="sensor-value">---</span>
+                    <span class="sensor-label">RIGHT</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="bottom-controls">
+            <!-- Steering -->
+            <div class="steering-controls">
+                <button class="dir-btn" data-dir="left">◀</button>
+                <button class="dir-btn" data-dir="right">▶</button>
+            </div>
+
+            <!-- Thrust -->
+            <button class="thrust-btn" data-thrust="forward">🚀</button>
+        </div>
+
+        <!-- Status -->
+        <div class="status-card">
+            <div class="status-text" id="status">Connecting...</div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

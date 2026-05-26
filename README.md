@@ -24,6 +24,7 @@ An autonomous RC car built with **ROS 2 Jazzy**, **Raspberry Pi 5**, and a web-b
 - **SolidWorks** (3D design)
 
 ## Project Structure
+
 ```bash
 rc-car-ros2/
 ├── src/
@@ -38,11 +39,14 @@ rc-car-ros2/
 │   └── 3d_models/                # STL files for 3D printed parts
 ├── .gitignore
 └── README.md
+```
 
 ## How to Run
+
 ```bash
 cd ~/ros2_robot_ws
 source install/setup.bash
 
 # Run full system
 ros2 launch web_interface web_control.launch.py
+```

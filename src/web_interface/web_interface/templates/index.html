@@ -4,60 +4,68 @@
     <title>RC Car Control</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     
-    <!-- iOS Full Screen Support -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5">
 </head>
 <body>
     <div class="container">
 
-        <!-- Live Camera Feed -->
+        <div id="warning-top" class="warning-edge"></div>
+        <div id="warning-left" class="warning-edge"></div>
+        <div id="warning-right" class="warning-edge"></div>
+
+        <div class="debug-parameters-panel">
+            <div>FRONT: <span id="db-front">---</span></div>
+            <div>LEFT:  <span id="db-left">---</span></div>
+            <div>RIGHT: <span id="db-right">---</span></div>
+            <hr class="debug-divider">
+            <div>THR:   <span id="db-throttle">0.00</span></div>
+            <div>SRV:   <span id="db-servo">0.00</span></div>
+        </div>
+
         <div class="camera-container">
            <img id="camera-feed" 
-                src="http://192.168.0.30:5000/camera_stream" 
-                alt="Live Camera Feed"
-                style="width:100%; height:100%; object-fit: contain; display:block;">
+                src="http://192.168.0.30:8080/stream?topic=/camera_node/image_raw&type=ros_compressed" 
+                alt="Live Camera Feed">
         </div>
 
-        <!-- Top Sensor Overlay -->
         <div class="sensor-overlay">
-            <div class="sensor-panel">
-                <div class="sensor-item">
-                    <span id="front-distance" class="sensor-value">---</span>
-                    <span class="sensor-label">FRONT</span>
-                </div>
-                <div class="sensor-item">
-                    <span id="left-distance" class="sensor-value">---</span>
-                    <span class="sensor-label">LEFT</span>
-                </div>
-                <div class="sensor-item">
-                    <span id="right-distance" class="sensor-value">---</span>
-                    <span class="sensor-label">RIGHT</span>
-                </div>
-            </div>
+            <svg class="radar-svg" viewBox="0 0 200 200">
+                <polygon id="cone-left" points="30,70 70,95 30,120" fill="rgba(0,255,136,0.3)" />
+                
+                <polygon id="cone-right" points="170,70 130,95 170,120" fill="rgba(0,255,136,0.3)" />
+                
+                <polygon id="cone-front" points="40,15 160,15 100,70" fill="rgba(0,255,136,0.3)" />
+                <line x1="100" y1="70" x2="70" y2="15" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+                <line x1="100" y1="70" x2="100" y2="15" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+                <line x1="100" y1="70" x2="130" y2="15" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+                
+                <rect x="70" y="70" width="60" height="90" rx="6" fill="#ffffff" />
+                <rect x="75" y="65" width="50" height="15" fill="#333333" rx="2" /> 
+            </svg>
+            <div class="radar-text" id="radar-readout">ALL CLEAR</div>
         </div>
 
-        <!-- Bottom Controls -->
         <div class="bottom-controls">
-            <!-- Steering -->
             <div class="steering-controls">
                 <button class="dir-btn" data-dir="left">◀</button>
                 <button class="dir-btn" data-dir="right">▶</button>
             </div>
 
-            <!-- Thrust Button -->
-            <button class="thrust-btn" data-thrust="forward">🚀</button>
+            <div class="throttle-controls">
+                <button class="thrust-btn reverse" data-thrust="reverse">⏬</button>
+                <button class="thrust-btn forward" data-thrust="forward">🚀</button>
+            </div>
         </div>
 
-        <!-- Status -->
         <div class="status-card">
             <div class="status-text" id="status">Connecting...</div>
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=5"></script>
 </body>
 </html>

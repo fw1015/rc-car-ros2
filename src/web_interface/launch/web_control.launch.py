@@ -20,23 +20,15 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 3. Servo Node (Steering)
+        # 3. i2c Manager Node (Sensor Data Handling)
         Node(
             package='robot_movement',
-            executable='servo_node',  
-            name='servo_node',
+            executable='i2c_manager',
+            name='i2c_manager',
             output='screen',
         ),
 
-        # 4. ESC Node (Throttle)
-        Node(
-            package='robot_movement',
-            executable='esc_node',
-            name='esc_node',
-            output='screen',
-        ),
-
-        # 5. Tof Sensor Node (Throttle)
+        # 4. Tof Sensor Node (Throttle)
         Node(
             package='robot_sensors',
             executable='tof_sensor_node',
@@ -44,7 +36,7 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 6. Ultrasonic Sensor Node (Throttle)
+        # 5. Ultrasonic Sensor Node (Throttle)
         Node(
             package='robot_sensors',
             executable='ultrasound_sensor_node',
@@ -52,7 +44,7 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 7. Camera Node (Video Streaming)
+        # 6. Camera Node (Video Streaming)
         Node(
             package='camera_ros',
             executable='camera_node',
@@ -60,8 +52,8 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {'camera_name': 'pi_cam'},
-                {'image_width': 640},
-                {'image_height': 480},
+                {'width': 854},
+                {'height': 480},
                 {'frame_rate': 15},
                 {'use_compressed': True},
                 {'camera': '/base/axi/pcie@120000/rp1/i2c@80000/imx708@1a'},   # Force camera
@@ -69,7 +61,7 @@ def generate_launch_description():
             arguments=['--ros-args', '--log-level', 'info']
         ),
 
-        # 8. Web Sever
+        # 7. Web Sever
         Node(
             package='web_video_server',
             executable='web_video_server',

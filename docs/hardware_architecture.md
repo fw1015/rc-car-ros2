@@ -4,27 +4,25 @@ This document outlines the hardware components and their corresponding ROS2 node
 
 ## Node Overview
 
-| Node                  | Hardware? | Model                        | Power     | Key Pins                                      | Placement   | Publishes                     | Subscribes                      | Message Type       |
-|-----------------------|-----------|------------------------------|-----------|-----------------------------------------------|-------------|-------------------------------|---------------------------------|--------------------|
-| `robot_brain_node`    | No        | -                            | -         | -                                             | -           | `/cmd_vel`                    | `/tof/distance`, `/cmd_vel_raw` | `Twist`, `Float64` |
-| `tof_sensor_node`     | Yes       | VL53L5CX (ToF)               | 3.3V      | SDA (GPIO2), SCL (GPIO3), Power               | Front       | `/tof/distance`               | -                               | `Float64`          |
-| `us_sensor_node (L)`  | Yes       | HC-SR04                      | 5V        | Trig (GPIO27), Echo (GPIO22)                  | Left Side   | `/left_distance`              | -                               | `Range`            |
-| `us_sensor_node (R)`  | Yes       | HC-SR04                      | 5V        | Trig (GPIO23), Echo (GPIO24)                  | Right Side  | `/right_distance`             | -                               | `Range`            |
-| `servo_node`          | Yes       | Futaba S3003                 | 5V        | Signal (GPIO17)                               | Internal    | -                             | `/cmd_vel`                      | `Twist`            |
-| `esc_node`            | Yes       | Tamiya TEU-104BK             | 7.2V      | PWM Signal (GPIO18)                           | Internal    | -                             | `/cmd_vel`                      | `Twist`            |
-| `camera_ros`          | Yes       | Raspberry Pi Camera Module 3 Wide | 5V (via Pi) | CSI Port (Ribbon Cable)                    | Front       | `/camera/image_raw/compressed`| -                               | `CompressedImage`  |
-| `web_server_node`     | No        | Flask + Socket               | -         | -                                             | -           | `/cmd_vel_raw`                | Sensors                         | `Twist`            |
-| `TXS0108E`            | Yes       | Level Shifter                | 3.3V/5V   | VA=3.3V, VB=5V                                | Internal    | -                             | -                               | -                  |
+| Node | Hardware? (Y/N) | Model | PIN Required | Placement | Publish | Subscriber | Message Type | Service/Client |
+|------|-----------------|-------|--------------|-----------|---------|------------|--------------|----------------|
+| `robot_brain_node` | N | NA | NA | NA | 1. `/cmd_vel` | 1. `/tof/distance`<br>2. `/cmd_vel_raw` | 1. `Float64`<br>2. `Twist` | Client to `i2c_manager` |
+| `tof_sensor_node` | Y | VL53L5CX | PIN 1 - 3V3 Power <=> LPn, PWREN, AVDD, IOVDD<br>PIN 3 - GPIO 2 (SDA) <=> SDA<br>PIN 5 - GPIO 3 (SCL) <=> SCL<br>PIN 9 - GND <=> GND | Front | 1. `/tof/distance` | | `Float64` | |
+| `us_sensor_node (L)` | Y | HC-SR04 | PIN 2 - 5V Power <=> VCC<br>PIN 9 - GND <=> GND<br>PIN 13 - GPIO 27 <=> Trig<br>PIN 15 - GPIO 22 <=> Echo | Side | 1. `/left_distance` | | | |
+| `us_sensor_node (R)` | Y | HC-SR04 | PIN 4 - 5V Power <=> VCC<br>PIN 9 - GND <=> GND<br>PIN 16 - GPIO 23 <=> Trig<br>PIN 18 - GPIO 24 <=> Echo | Side | 1. `/right_distance` | | | |
+| `i2c_manager` | Y | Futaba 53003 (Servo)<br>QUICRUN-1060 (ESC)<br>PCA9685 | 3PINS <=> PCA Channel 2<br>3PINS <=> PCA Channel 0<br>PIN 7 - GPIO 4 (SDA) <=> i2c bus2 SDA<br>PIN 29 - GPIO 5 (SCL) <=> i2c bus2 SCL<br>PIN 17 3V3 Power <=> VCC<br>ESC Signal <=> Channel 0<br>PIN 34 - GND <=> OE<br>PIN 39 - GND <=> GND | Mid | | | | Service to `robot_brain_node` |
+| `web_server_node` | N | NA | NA | NA | 1. `/cmd_vel_raw` | 1. `/tof/distance`<br>2. `/left_distance`<br>3. `/right_distance` | | |
 
 ## Power Architecture
 
-- **Main Battery (7.2V NiMH)**: Powers ESC directly + Servo (via UBEC in future)
-- **Pi 5V Rail**: Powers Raspberry Pi, Camera Module 3, and HC-SR04 sensors
-- **Pi 3.3V Rail**: Powers logic level (ToF sensor, TXS0108E VA)
-- **Common Ground**: All components share the same ground
+- **Main Battery (7.2V NiMH)**: Powers the ESC directly.
+- **ESC Built-in BEC (6V/3A)**: The QUICRUN 1060 ESC automatically steps down the battery voltage and powers the PCA9685 V+ rail, which safely drives the Futaba S3003 Steering Servo.
+- **Pi 5V Rail**: Powers the Raspberry Pi, Camera Module 3, and HC-SR04 ultrasonic sensors.
+- **Pi 3.3V Rail**: Powers logic level components (VL53L5CX ToF sensor and PCA9685 VCC logic).
+- **Common Ground**: All components (Pi, Sensors, PCA9685, ESC) share a common ground to prevent signal floating.
 
 ## Notes
 
-- HC-SR04 Echo pins use voltage divider (1kΩ + 1kΩ) to step down 5V → 3.3V.
-- Camera uses the official CSI port on the Pi 5.
-- Future improvement: Dedicated 5V UBEC + better power distribution board.
+- HC-SR04 Echo pins use a voltage divider (1kΩ + 1kΩ) to safely step down the 5V return signal to 2.5V, which registers as a safe logic HIGH for the Pi's 3.3V GPIO pins.
+- The Camera stream utilizes the official CSI ribbon port on the Pi 5 to free up USB bandwidth.
+- The I2C PCA9685 board successfully isolates the 3.3V Pi logic from the 6V servo power rail.

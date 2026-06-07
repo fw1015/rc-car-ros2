@@ -1,92 +1,118 @@
-// ================================================
-// RC Car Web Interface - Frontend JavaScript
-// ================================================
-
-// === Visible Debug Panel (for development & testing) ===
-function createDebugPanel() {
-    let debug = document.getElementById('debug-panel');
-    if (!debug) {
-        debug = document.createElement('div');
-        debug.id = 'debug-panel';
-        debug.style.cssText = 'position:fixed; top:10px; left:10px; background:rgba(0,0,0,0.8); color:#0f0; padding:8px 12px; font-size:14px; border-radius:6px; z-index:9999; font-family:monospace;';
-        document.body.appendChild(debug);
-    }
-    return debug;
-}
-const debugPanel = createDebugPanel();
+// ==========================================================
+// RC Robot Vehicle Teleoperation & Dashboard Interface Module
+// ==========================================================
 
 /**
- * Updates the on-screen debug panel with current control states
+ * Initializes the system connectivity feedback banner.
+ * @param {string} text - The status message to display.
  */
-function updateDebug(steering, thrust) {
-    debugPanel.innerHTML = `
-        Steering: <b>${steering || '—'}</b><br>
-        Thrust: <b>${thrust ? 'ACTIVE' : '—'}</b><br>
-    `;
-}
-
-// === Status Indicator ===
 function setStatus(text) {
     document.getElementById('status').textContent = text;
 }
 setStatus('Connected ✅');
 
-// === Sensor Data Polling ===
+/**
+ * Dynamically updates the SVG proximity radar and full-screen warning overlays.
+ * Applies color-coded safety constraints based on sensor distance.
+ * * @param {number} distance - Distance in centimeters.
+ * @param {string} coneId - DOM ID of the SVG cone element.
+ * @param {string} warningId - DOM ID of the screen edge warning overlay.
+ * @returns {Object} State object containing the `isDanger` boolean.
+ */
+function updateRadarUI(distance, coneId, warningId) {
+    const cone = document.getElementById(coneId);
+    const warning = document.getElementById(warningId);
+    
+    // Safety check if DOM nodes are missing
+    if (!cone) console.error(`Missing SVG element: ${coneId}`);
+    if (!warning) console.error(`Missing warning overlay: ${warningId}`);
+
+    if (distance === null || distance === undefined) return { isDanger: false };
+
+    // Clamp calculations to standard limits (0cm up to max 100cm filter)
+    const d = Math.max(0, Math.min(100, distance));
+    let color = 'rgba(0, 255, 136, 0.3)'; // Default Safety Green
+    let overlayOpacity = 0;
+    let isDanger = false;
+
+    if (d <= 30) {
+        // Critical Danger: Force Red Cone + Linear Screen Border Glare Fade
+        color = 'rgba(255, 68, 68, 0.8)'; 
+        overlayOpacity = 0.8 * (1.0 - (d / 30.0)); 
+        isDanger = true;
+    } else if (d <= 60) {
+        // Moderate Warning Area: Shift graphic color state to Yellow
+        color = 'rgba(255, 170, 0, 0.6)'; 
+    }
+
+    // Apply immediate visual rendering updates to view elements
+    if (cone) cone.setAttribute('fill', color);
+    if (warning) warning.style.opacity = overlayOpacity;
+
+    return { isDanger };
+}
+
+/**
+ * Asynchronous Telemetry Poller.
+ * Fetches real-time sensor data from the Flask backend and updates the UI.
+ */
 function updateSensor() {
     fetch('/sensor_data')
         .then(response => response.json())
         .then(data => {
-            console.log("📡 Received sensor data:", data);   // ← Check this in console
+            // Live Debug console reporting trace map for performance monitoring
+            console.log(`[Telemetry] F:${data.front} L:${data.left} R:${data.right} | T:${data.throttle} S:${data.steering}`);
 
-            // Front sensor
-            if (data.front !== undefined && data.front !== null) {
-                const frontEl = document.getElementById('front-distance');
-                const val = Math.round(data.front);
-                frontEl.textContent = `${val} cm`;
-                frontEl.style.color = val < 30 ? '#ff4444' : val < 60 ? '#ffaa00' : '#00ff88';
-            }
+            // 1. Refresh Graphical Core Vector Map
+            const front = updateRadarUI(data.front, 'cone-front', 'warning-top');
+            const left = updateRadarUI(data.left, 'cone-left', 'warning-left');
+            const right = updateRadarUI(data.right, 'cone-right', 'warning-right');
 
-            // Left sensor
-            if (data.left !== undefined && data.left !== null) {
-                const leftEl = document.getElementById('left-distance');
-                const val = Math.round(data.left);
-                leftEl.textContent = `${val} cm`;
-                leftEl.style.color = val < 30 ? '#ff4444' : val < 60 ? '#ffaa00' : '#00ff88';
-            }
+            // 2. Populate Numeric Readouts inside the Left Diagnostic panel
+            document.getElementById('db-front').textContent = (data.front !== null && data.front !== undefined) ? `${Math.round(data.front)} cm` : '---';
+            document.getElementById('db-left').textContent  = (data.left  !== null && data.left  !== undefined) ? `${Math.round(data.left)} cm` : '---';
+            document.getElementById('db-right').textContent = (data.right !== null && data.right !== undefined) ? `${Math.round(data.right)} cm` : '---';
+            
+            document.getElementById('db-throttle').textContent = (data.throttle !== null && data.throttle !== undefined) ? data.throttle.toFixed(2) : '0.00';
+            document.getElementById('db-servo').textContent    = (data.steering !== null && data.steering !== undefined) ? data.steering.toFixed(2) : '0.00';
 
-            // Right sensor
-            if (data.right !== undefined && data.right !== null) {
-                const rightEl = document.getElementById('right-distance');
-                const val = Math.round(data.right);
-                rightEl.textContent = `${val} cm`;
-                rightEl.style.color = val < 30 ? '#ff4444' : val < 60 ? '#ffaa00' : '#00ff88';
+            // 3. Cycle Text Banner state directly beneath vectors
+            const readout = document.getElementById('radar-readout');
+            if (front.isDanger || left.isDanger || right.isDanger) {
+                readout.textContent = "PROXIMITY WARNING";
+                readout.style.color = "#ff4444";
             } else {
-                console.log("⚠️ Right sensor is null or missing");
+                readout.textContent = "ALL CLEAR";
+                readout.style.color = "#00ff88";
             }
         })
-        .catch(err => {
-            console.error("❌ Failed to fetch sensor data:", err);
-        });
+        .catch(err => console.error("❌ Failed to process incoming telemetry data stream:", err));
 }
-setInterval(updateSensor, 300);
-updateSensor();   // Initial call
+// 150ms execution window generates high refresh speeds for safety alerts
+setInterval(updateSensor, 150);
+updateSensor(); // Instant baseline loop invocation
 
-// === Camera Streaming (Dynamic URL) ===
+/**
+ * Initializes the live MJPEG camera stream.
+ * Dynamically resolves the host IP to prevent CORS and hardcoding issues.
+ */
 function initCamera() {
     const cam = document.getElementById('camera-feed');
     if (cam) {
         const host = window.location.hostname;
         cam.src = `http://${host}:8080/stream?topic=/camera_node/image_raw&type=ros_compressed`;
-        console.log(host)
-        console.log("Camera stream set to: " + cam.src)
+        console.log(`Camera stream set dynamically to host: ${host}`);
     }
 }
 initCamera();
 
-// === Command sender ===
+/**
+ * Synchronous Command Transmission Handler.
+ * Dispatches JSON hardware commands to the Flask web server.
+ * * @param {string} type - The command type ('direction' or 'throttle').
+ * @param {string} value - The requested state ('left', 'right', 'forward', 'reverse', 'stop').
+ */
 function sendCommand(type, value) {
-    console.log(`[JS] Sending → ${type}: ${value}`);
-
     fetch('/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,14 +120,10 @@ function sendCommand(type, value) {
     });
 }
 
-// === Multi-Touch Control Logic ===
+// === Asynchronous Multi-Touch State Engine ===
 let activeSteering = null;
 let steerInterval = null;
-let thrustActive = false;
 
-/**
- * Handles pointer down (mouse or touch start)
- */
 const handleDown = (e) => {
     e.preventDefault();
     const btn = e.currentTarget;
@@ -109,22 +131,17 @@ const handleDown = (e) => {
         const dir = btn.dataset.dir;
         if (activeSteering === dir) return;
         activeSteering = dir;
-        btn.classList.add('active');
         sendCommand('direction', dir);
-
-        // Repeat command while button is held
+        
+        // Loop execution while pointer maintains active state prevents command drops
+        clearInterval(steerInterval);
         steerInterval = setInterval(() => sendCommand('direction', dir), 80);
     } else if (btn.classList.contains('thrust-btn')) {
-        thrustActive = true;
-        btn.classList.add('active');
-        sendCommand('throttle', 'forward');
+        const action = btn.dataset.thrust;
+        sendCommand('throttle', action);
     }
-    updateDebug(activeSteering, thrustActive);
 };
 
-/**
- * Handles pointer up / cancel (mouse or touch end)
- */
 const handleUp = (e) => {
     e.preventDefault();
     const btn = e.currentTarget;
@@ -132,18 +149,15 @@ const handleUp = (e) => {
         if (activeSteering) {
             clearInterval(steerInterval);
             sendCommand('direction', 'stop');
-            btn.classList.remove('active');
             activeSteering = null;
         }
     } else if (btn.classList.contains('thrust-btn')) {
-        thrustActive = false;
-        btn.classList.remove('active');
-        sendCommand('throttle', 'stop');
+        // Releasing a drive button naturally cuts power and triggers neutral brake state
+        sendCommand('throttle', 'stop'); 
     }
-    updateDebug(activeSteering, thrustActive);
 };
 
-// Attach to buttons
+// Wire engine touch/pointer maps cleanly to HTML interface elements
 document.querySelectorAll('.dir-btn, .thrust-btn').forEach(btn => {
     btn.addEventListener('pointerdown', handleDown, { passive: false });
     btn.addEventListener('pointerup', handleUp, { passive: false });

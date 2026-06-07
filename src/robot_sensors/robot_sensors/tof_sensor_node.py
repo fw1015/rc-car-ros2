@@ -1,105 +1,115 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
-import time
-import os
 import vl53l5cx_ctypes as vl53l5cx
 
 class TofSensorPublisher(Node):
     """
-    Node for the VL53L5CX Time-of-Flight (ToF) sensor.
+    Hardware driver node for the VL53L5CX Time-of-Flight sensor.
     
-    This node reads distance data from the front-facing ToF sensor
-    and publishes the minimum reliable distance as a Float64 message.
+    Responsibilities:
+    - Initializes the I2C ToF sensor in 4x4 grid resolution mode.
+    - Polls the hardware synchronously at 10Hz.
+    - Applies spatial clustering (neighbor check) to the center 4 zones to filter noise.
+    - Publishes the final reliable distance in meters to the `/tof/distance` topic.
     """
-    
+
     def __init__(self):
         super().__init__('tof_sensor_node')
 
-        # Publisher for front distance (in meters)
         self.publisher = self.create_publisher(Float64, '/tof/distance', 10)
         
+        # Hardware State
         self.tof = None
-        self.init_sensor()
+        self.init_tof_sensor()
 
-        # Timer to read sensor at 10Hz (every 100ms)
+        # Timer to read the sensor at 10 Hz (must match the hardware ranging frequency)
         self.timer = self.create_timer(0.1, self.timer_callback)
 
-        self.get_logger().info('ToF Sensor Node Started')
+        self.get_logger().info('ToF Sensor Node started (Standalone)')
 
-    def init_sensor(self):
-        """Initialize the VL53L5CX sensor with 4x4 resolution."""
+    def init_tof_sensor(self):
+        """Attempts to initialize the bare-metal VL53L5CX sensor over I2C."""
         try:
             self.tof = vl53l5cx.VL53L5CX()
             self.tof.set_resolution(4*4)
             self.tof.set_ranging_frequency_hz(10)
             self.tof.start_ranging()
-            self.get_logger().info('VL53L5CX sensor initialized successfully')
+            self.get_logger().info("✅ VL53L5CX initialized successfully")
         except Exception as e:
-            self.get_logger().error(f'Failed to initialize sensor: {e}')
+            self.get_logger().error(f"Failed to init ToF sensor: {e}")
             self.tof = None
 
-    def distance_sensing(self):
-        """Read the minimum reliable distance from the ToF sensor."""
+    def timer_callback(self):
+        """
+        Main sensor polling loop. Retrieves the raw 4x4 distance grid, isolates 
+        the forward-facing path, applies noise filtering, and publishes the result.
+        """
+        # Publish safe default (4.0m) if the sensor hardware is dead or disconnected
         if self.tof is None:
-            self.get_logger().warn('Sensor not initialized')
-            return 4.0      # Return safe default (max range)
-        
+            msg = Float64()
+            msg.data = 4.0
+            self.publisher.publish(msg)
+            return
+
         try:
             if self.tof.data_ready():
                 data = self.tof.get_data()
                 distances = list(data.distance_mm[0])
                 statuses = list(data.target_status[0])
-                all_dist = []
-                for row in range(4):    # 4x4 = 16 zones
-                    row_values = []
-                    for col in range(4):
-                        idx = row * 4 + col
-                        dist = distances[idx]
-                        status = statuses[idx]
-                        # Status 5 and 9 typically mean valid target detected
-                        if status in (5, 9) and dist > 0:
-                            all_dist.append(dist)
                 
-                if all_dist:
-                    min_dist_mm = min(all_dist)
-                    min_dist_m = min_dist_mm/1000       # Convert to meters
-                    return min_dist_m
+                # 1. Isolate the center 4 zones of the 4x4 grid
+                # Indices 5, 6, 9, 10 form the exact physical center of the FOV.
+                center_zones = [5, 6, 9, 10]
+                center_dists = {}
+
+                for i in center_zones:
+                    # Statuses 5 and 9 are VL53L5CX hardware codes for "Range Valid"
+                    if statuses[i] in (5, 9) and distances[i] > 0:
+                        center_dists[i] = distances[i]
+
+                valid_obstacle_dists = []
+
+                # 2. Spatial Clustering: The "Neighbor Check"
+                # To prevent phantom braking from stray reflections, a distance point is 
+                # only considered valid if an adjacent zone agrees within 150mm (15cm).
+                for zone_index, dist in center_dists.items():
+                    has_neighbor = any(
+                        abs(dist - other_dist) < 150 
+                        for other_index, other_dist in center_dists.items() 
+                        if other_index != zone_index
+                    )
+                    if has_neighbor:
+                        valid_obstacle_dists.append(dist)
+
+                # 3. Calculate Final Safe Distance and Publish
+                msg = Float64()
+                if valid_obstacle_dists:
+                    # Return the closest verified threat, converted from mm to meters
+                    msg.data = min(valid_obstacle_dists) / 1000.0  # Convert to meters
                 else:
-                    self.get_logger().warn('No valid distance readings')
-                    return 4.0
-            else:
-                return 4.0  # No new data available yet
-        
+                    msg.data = 4.0
+                    
+                self.publisher.publish(msg)
+
         except Exception as e:
-            self.get_logger().error(f'Error reading sensor: {e}')
-            return 4.0
+            self.get_logger().warning(f"Error reading ToF: {e}")
+            # Failsafe on I/O error
+            msg = Float64()
+            msg.data = 4.0
+            self.publisher.publish(msg)
 
-
-    def timer_callback(self):
-        """Timer callback to periodically publish distance."""
-        distance = self.distance_sensing()
-
-        # Safety clamp: keep distance between 0.02m and 4.0m
-        distance = max(0.02, min(4.0, distance))
-        msg = Float64()
-        msg.data = distance
-        self.publisher.publish(msg)
-
-        # Optional debug logging (uncomment when needed)
-        # if distance < 0.4:
-        #     self.get_logger().warn(f'⚠️ Close obstacle detected: {distance:.2f}m')
-        # else:
-        #     self.get_logger().debug(f'Front distance: {distance:.2f}m')
 
 def main(args=None):
     rclpy.init(args=args)
     node = TofSensorPublisher()
-
+    
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info('Shutting down ToF Sensor Node...')
+        pass
     finally:
         node.destroy_node()
         rclpy.shutdown()

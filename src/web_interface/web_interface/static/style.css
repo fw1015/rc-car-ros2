@@ -1,4 +1,4 @@
-/* ==================== RESET & BASE ==================== */
+/* ==================== RESET & BASE STYLE CONFIG ==================== */
 * {
     margin: 0;
     padding: 0;
@@ -46,37 +46,95 @@ html, body {
     display: block;
 }
 
-/* ==================== SENSOR OVERLAY ==================== */
-.sensor-overlay {
+/* ==================== PROXIMITY WARNINGS ==================== */
+.warning-edge {
     position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    background: rgba(0, 0, 0, 0.65);
-    padding: 8px 25px;
-    border-radius: 20px;
-    backdrop-filter: blur(10px);
+    z-index: 5; /* Keeps it under the UI */
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease-out; /* Faster, smoother pulsing */
+}
+#warning-top { 
+    top: 0; left: 0; right: 0; height: 12vh; /* Thinner */
+    background: linear-gradient(to bottom, rgba(255,0,0,0.5), transparent); 
+}
+#warning-left { 
+    top: 0; left: 0; bottom: 0; width: 8vw; /* Thinner */
+    background: linear-gradient(to right, rgba(255,0,0,0.5), transparent); 
+}
+#warning-right { 
+    top: 0; right: 0; bottom: 0; width: 8vw; /* Thinner */
+    background: linear-gradient(to left, rgba(255,0,0,0.5), transparent); 
 }
 
-.sensor-panel {
+/* ==================== DIAGNOSTIC TELEMETRY MODULE (TOP LEFT) ==================== */
+.debug-parameters-panel {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    z-index: 110;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    color: #00ff88;
+    line-height: 1.6;
+    pointer-events: none;
+    min-width: 145px;
+}
+
+.debug-parameters-panel div {
     display: flex;
-    gap: 25px;
+    justify-content: space-between;
+    gap: 12px;
 }
 
-.sensor-item {
-    text-align: center;
-}
-
-.sensor-value {
-    display: block;
-    font-size: 1.1rem;
+.debug-parameters-panel span {
+    color: #ffffff;
     font-weight: bold;
 }
 
-.sensor-label {
-    font-size: 0.75rem;
-    opacity: 0.8;
+.debug-divider {
+    border: 0;
+    border-top: 1px solid rgba(0,255,136,0.2);
+    margin: 6px 0;
+}
+
+/* ==================== RADAR VEHICLE MAP OVERLAY ==================== */
+.sensor-overlay {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px 18px;
+    border-radius: 15px;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.radar-svg {
+    width: 110px;
+    height: 110px;
+    margin-bottom: 5px;
+}
+
+.radar-svg polygon {
+    transition: fill 0.15s ease-out;
+}
+
+.radar-text {
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #00ff88;
+    font-family: monospace;
 }
 
 /* ==================== BOTTOM CONTROLS ==================== */
@@ -92,7 +150,7 @@ html, body {
     pointer-events: auto;
 }
 
-.steering-controls {
+.steering-controls, .throttle-controls {
     display: flex;
     gap: 15px;
 }
@@ -102,30 +160,41 @@ html, body {
     border: none;
     border-radius: 50%;
     color: white;
-    z-index: 30;
+    z-index: 120;
     pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     -webkit-tap-highlight-color: transparent;
+    transition: transform 0.05s ease-in-out, background-color 0.1s ease;
 }
 
 .dir-btn {
-    width: 70px;
-    height: 70px;
+    width: 75px;
+    height: 75px;
     font-size: 32px;
     background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255,255,255,0.1);
 }
 
 .thrust-btn {
-    width: 80px;
-    height: 80px;
-    font-size: 36px;
-    background: #00ff88;
-    color: #000;
+    width: 75px;
+    height: 75px;
+    font-size: 30px;
 }
+
+.thrust-btn.forward { background: #00ff88; color: #000; }
+.thrust-btn.reverse { background: #ffaa00; color: #000; }
+.thrust-btn.brake   { background: #ff4444; color: #fff; }
 
 /* ==================== STATUS ==================== */
 .status-card {
     position: absolute;
     top: 15px;
     right: 15px;
-    z-index: 20;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
 }

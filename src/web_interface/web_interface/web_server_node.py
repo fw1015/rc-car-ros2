@@ -25,6 +25,9 @@ class WebServerNode(Node):
         
         # Publisher for raw commands coming from the web interface
         self.publisher = self.create_publisher(Twist, '/cmd_vel_raw', 10)
+        
+        # Subscriptions for adjusted commands after processing in the Robot Brain
+        self.create_subscription(Twist, '/cmd_vel_adjusted', self.adjusted_callback, 10)
 
         # Subscriptions to sensor topics
         self.create_subscription(Float64, '/tof/distance', self.front_callback, 10)
@@ -42,6 +45,8 @@ class WebServerNode(Node):
         self.thrust = 0.0
         self.thrust_step = 0.25
         self.thrust_max = 0.9
+        self.adj_thrust = 0.0
+        self.adj_steering = 0.0
 
         # Flask App Initialization
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -66,8 +71,10 @@ class WebServerNode(Node):
                 'front': self.latest_front_distance,
                 'left': self.latest_left_distance,
                 'right': self.latest_right_distance,
-                'throttle': self.thrust,
-                'steering': self.steering
+                'throttle_raw': self.thrust,
+                'throttle_adjusted': self.adj_thrust,
+                'steering_raw': self.steering,
+                'steering_adjusted': self.adj_steering
             })
 
         @self.app.route('/camera_stream')
@@ -96,21 +103,36 @@ class WebServerNode(Node):
             cmd_type = data.get('type')
             value = data.get('value')
 
+            # Handle Configuration Settings (Max Speed Limiter)
+            if cmd_type == 'setting':
+                if data.get('target') == 'max_speed':
+                    self.thrust_max = float(value)
+                    # Clamp current thrust down immediately if we lower the speed limit while driving
+                    if abs(self.thrust) > self.thrust_max:
+                        self.thrust = self.thrust_max if self.thrust > 0 else -self.thrust_max
+                    
+                    self.get_logger().info(f'⚙️ Speed Governor updated to: {self.thrust_max:.2f}')
+                    return jsonify({'status': 'ok'})
+
             # Update Steering State
-            if cmd_type == 'direction':
+            elif cmd_type == 'direction':
                 if value == 'left':
-                    self.steering = min(1.0, self.steering + self.steering_step)
+                    steering_count = self.steering + self.steering_step
+                    self.steering = min(1.0, steering_count)
                 elif value == 'right':
-                    self.steering = max(-1.0, self.steering - self.steering_step)
+                    steering_count = self.steering - self.steering_step
+                    self.steering = max(-1.0, steering_count)
                 elif value == 'stop':
                     self.steering = 0.0
                 
             # Update Throttle State
             elif cmd_type == 'throttle':
                 if value == 'forward':
-                    self.thrust = min(self.thrust_max, self.thrust + self.thrust_step)
+                    thrust_count = self.thrust + self.thrust_step
+                    self.thrust = min(self.thrust_max, thrust_count)
                 elif value == 'reverse':
-                    self.thrust = max(-self.thrust_max, self.thrust - self.thrust_step)
+                    thrust_count = self.thrust - self.thrust_step
+                    self.thrust = max(-self.thrust_max, thrust_count)
                 elif value == 'brake' or value == 'stop':
                     # Snaps the ESC back to a 1500us neutral pulse
                     self.thrust = 0.0
@@ -123,6 +145,11 @@ class WebServerNode(Node):
             self.publisher.publish(twist)
             return jsonify({'status': 'ok'})
 
+    def adjusted_callback(self, msg):
+        """Update adjusted command values."""
+        self.adj_thrust = msg.linear.x
+        self.adj_steering = msg.angular.z
+
     def front_callback(self, msg):
         """Update latest front distance from ToF sensor (Convert to cm for UI)."""
         distance_cm = msg.data * 100
@@ -131,13 +158,13 @@ class WebServerNode(Node):
 
     def left_callback(self, msg):
         """Update latest left distance from ultrasonic sensor (Convert to cm for UI)."""
-        distance_cm = msg.range * 100
+        distance_cm = max(0.0, msg.range * 100 - 7)
         self.latest_left_distance = distance_cm
         self.get_logger().info(f'Left Distance: {distance_cm:.1f} cm')
 
     def right_callback(self, msg):
         """Update latest right distance from ultrasonic sensor (Convert to cm for UI)."""
-        distance_cm = msg.range * 100
+        distance_cm = max(0.0, msg.range * 100 - 7)
         self.latest_right_distance = distance_cm
         self.get_logger().info(f'Right Distance: {distance_cm:.1f} cm')
 

@@ -26,6 +26,9 @@ class RobotBrainNode(Node):
             depth=1
         )
 
+        # Publisher for adjusted commands after processing in the Robot Brain
+        self.adjusted_publisher = self.create_publisher(Twist, '/cmd_vel_adjusted', 10)
+
         # Subscriptions
         self.create_subscription(Float64, '/tof/distance', self.front_dist_callback, 10)
         self.create_subscription(Twist, '/cmd_vel_raw', self.move_cmd_callback, qos_profile)
@@ -35,8 +38,12 @@ class RobotBrainNode(Node):
 
         # State memory
         self.front_distance = None
-        self.last_raw_throttle = None
-        self.last_raw_steering = None
+        self.last_raw_throttle = 0.0
+        self.last_adjusted_throttle = 0.0
+        self.last_steering = 0.0
+
+        # Asynchronous timer for Active Braking
+        self.brake_timer = None
 
         # Safety Timer
         self.last_cmd_time = self.get_clock().now()
@@ -46,8 +53,15 @@ class RobotBrainNode(Node):
         self.get_logger().info('✅ Robot Brain Node started: Teleoperation & Safety active.')
 
     def front_dist_callback(self, msg: Float64):
-        """Updates the internal state with the latest valid ToF distance in meters."""
-        self.front_distance = msg.data
+        """Updates the internal state with the true bumper-to-obstacle distance."""
+        # Hardware Offset: Sensor is 22mm (0.022m) behind the physical front bumper.
+        # Subtract 0.022m, clamping at 0.0 to prevent negative distances.
+        self.front_distance = max(0.0, msg.data - 0.022)
+
+        if self.last_raw_throttle > 0.0:
+            temp_msg = Twist()
+            temp_msg.linear.x = self.last_raw_throttle
+            self.sensor_control_adjust(temp_msg)
 
     def move_cmd_callback(self, msg: Twist):
         """
@@ -57,42 +71,100 @@ class RobotBrainNode(Node):
         self.last_cmd_time = self.get_clock().now()
         self.safety_active = False
 
-        # Throttle processing (Includes obstacle avoidance logic)
-        if msg.linear.x != self.last_raw_throttle:
-            self.sensor_control_adjust(msg)
+        self.last_raw_throttle = msg.linear.x
+        self.sensor_control_adjust(msg)
 
         # Steering processing (Direct passthrough)
-        if msg.angular.z != self.last_raw_steering:
+        if msg.angular.z != self.last_steering:
             self.send_command(channel=2, value=msg.angular.z)
-            self.last_raw_steering = msg.angular.z
+            self.last_steering = msg.angular.z
 
     def sensor_control_adjust(self, msg: Twist):
         """
-        Dynamic Obstacle Avoidance: Adjusts forward throttle based on proximity.
+        Dynamic Obstacle Avoidance: Enforces a 1.5-meter Deceleration Zone 
+        where forward throttle is linearly clamped based on true bumper distance.
         """
         adjusted_throttle = msg.linear.x
         
         # Only apply safety brakes if the user is trying to drive FORWARD
         if adjusted_throttle > 0.0 and self.front_distance is not None:
 
-            if self.front_distance < 0.15:  
-                # CRITICAL STOP: Less than 15cm. Override user completely.
+            # 1. HARD STOP
+            if self.front_distance < 0.08:
                 adjusted_throttle = min(0.0, adjusted_throttle)
-                self.get_logger().warn(f"🚧 Wall at {self.front_distance:.2f}m! Forward motion disabled.")
+                self.get_logger().warn(f"🚧 Wall at {self.front_distance:.2f}m! Emergency Stop.")
                 
-            elif self.front_distance < 1.0: 
-                # PROXIMITY CRAWL: Between 15cm and 1 meter. 
-                # Throttle is linearly clamped by distance (e.g., 0.6m away = 60% max throttle)
-                max_allowed_throttle = self.front_distance
-                
+            # 2. DECELERATION ZONE (<= 1.50 meter)
+            # Spreadsheet mapping: Throttle = Distance / 3.0 (e.g., 1.5m = 0.50, 0.3m = 0.10)
+            elif self.front_distance <= 1.50: 
+                max_allowed_throttle = self.front_distance / 3.5
                 if adjusted_throttle > max_allowed_throttle:
                     adjusted_throttle = max_allowed_throttle
                     
-        # Dispatch the adjusted command
-        self.send_command(channel=0, value=adjusted_throttle)
+        # SPAM FILTER & BRAKE ROUTING
+        if adjusted_throttle != self.last_adjusted_throttle:
+            
+            # ACTIVE BRAKING
+            if adjusted_throttle == 0.0 and self.last_adjusted_throttle > 0.0:
+                self.engage_active_brake(self.last_adjusted_throttle)
+            else:
+                if self.brake_timer is not None:
+                    self.brake_timer.cancel()
+                    self.brake_timer = None
+                
+                # DEADBAND BOOST: minimum crawl speed as 0.15 to prevent stalling in tight maneuvers (e.g., 0.10 → 0.15)
+                if 0.0 < adjusted_throttle < 0.15:
+                    adjusted_throttle = 0.15
+
+                self.send_command(channel=0, value=adjusted_throttle)
+
+            # Publish the state to the UI
+            pub_msg = Twist()
+            pub_msg.linear.x = float(adjusted_throttle)
+            pub_msg.angular.z = float(self.last_steering)
+            self.adjusted_publisher.publish(pub_msg)
+            
+            self.last_adjusted_throttle = adjusted_throttle
+
+    def engage_active_brake(self, previous_velocity: float) -> None:
+        """
+        Active Braking: Applies exact negative force with a stepped duration based on velocity.
+        """
+        if self.brake_timer is not None:
+            self.brake_timer.cancel()
+            self.brake_timer = None
         
-        # Save state to prevent spamming the I2C bus with duplicate values
-        self.last_raw_throttle = adjusted_throttle
+        # 1. FORCE CALCULATION (From Spreadsheet)
+        # Applying exact opposite of previous velocity
+        brake_force = -previous_velocity * 1.5
+        
+        # 2. STEPPED DURATION (From Spreadsheet)
+        # Categorized timers based on how fast the car was going
+        abs_vel = abs(previous_velocity)
+        if abs_vel <= 0.25:
+            brake_duration = 0.20
+        elif abs_vel <= 0.50:
+            brake_duration = 0.25
+        elif abs_vel <= 0.75:
+            brake_duration = 0.30
+        else:
+            brake_duration = 0.50
+        
+        # Dispatch the brake command
+        self.send_command(channel=0, value=brake_force)
+        self.get_logger().info(f"🛑 Active Braking: Pulsing {brake_force:.2f} thrust for {brake_duration}s")
+        
+        # Start a single-shot timer to release the brakes automatically
+        self.brake_timer = self.create_timer(brake_duration, self.release_brake)
+
+    def release_brake(self) -> None:
+        """Returns the ESC to absolute neutral coasting."""
+        self.send_command(channel=0, value=0.0)
+        self.get_logger().info("⚪ Brakes Released -> Neutral Coast")
+        
+        if self.brake_timer is not None:
+            self.brake_timer.cancel()
+            self.brake_timer = None
 
     def send_command(self, channel: int, value: float):
         """Asynchronously dispatches hardware commands via the SetESCServo service."""
@@ -134,10 +206,8 @@ class RobotBrainNode(Node):
 
             # Reset local state to ensure next command passes the spam filter
             self.last_raw_throttle = 0.0
-            self.last_raw_steering = 0.0
-    
-    
-
+            self.last_adjusted_throttle = 0.0
+            self.last_steering = 0.0
 
 def main(args=None):
     rclpy.init(args=args)

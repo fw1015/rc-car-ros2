@@ -61,7 +61,7 @@ function updateSensor() {
         .then(response => response.json())
         .then(data => {
             // Live Debug console reporting trace map for performance monitoring
-            console.log(`[Telemetry] F:${data.front} L:${data.left} R:${data.right} | T:${data.throttle} S:${data.steering}`);
+            console.log(`[Telemetry] F:${data.front} L:${data.left} R:${data.right} | T_raw:${data.throttle_raw} T_adj:${data.throttle_adjusted} S_raw:${data.steering_raw} S_adj:${data.steering_adjusted}`);
 
             // 1. Refresh Graphical Core Vector Map
             const front = updateRadarUI(data.front, 'cone-front', 'warning-top');
@@ -73,8 +73,18 @@ function updateSensor() {
             document.getElementById('db-left').textContent  = (data.left  !== null && data.left  !== undefined) ? `${Math.round(data.left)} cm` : '---';
             document.getElementById('db-right').textContent = (data.right !== null && data.right !== undefined) ? `${Math.round(data.right)} cm` : '---';
             
-            document.getElementById('db-throttle').textContent = (data.throttle !== null && data.throttle !== undefined) ? data.throttle.toFixed(2) : '0.00';
-            document.getElementById('db-servo').textContent    = (data.steering !== null && data.steering !== undefined) ? data.steering.toFixed(2) : '0.00';
+            document.getElementById('db-throttle-raw').textContent = (data.throttle_raw !== null && data.throttle_raw !== undefined) ? data.throttle_raw.toFixed(2) : '0.00';
+            document.getElementById('db-throttle-adjusted').textContent = (data.throttle_adjusted !== null && data.throttle_adjusted !== undefined) ? data.throttle_adjusted.toFixed(2) : '0.00';
+            document.getElementById('db-servo-raw').textContent    = (data.steering_raw !== null && data.steering_raw !== undefined) ? data.steering_raw.toFixed(2) : '0.00';
+            document.getElementById('db-servo-adjusted').textContent = (data.steering_adjusted !== null && data.steering_adjusted !== undefined) ? data.steering_adjusted.toFixed(2) : '0.00';
+            
+            // Visual indicator: If Brain Node is overriding the user, highlight it in red
+            const adjThrottleEl = document.getElementById('db-throttle-adjusted');
+            if (data.throttle_raw !== data.throttle_adjusted) {
+                adjThrottleEl.style.color = '#ff4444'; // Red = Brakes Applied!
+            } else {
+                adjThrottleEl.style.color = '#00ff88'; // Green = Passthrough OK
+            }
 
             // 3. Cycle Text Banner state directly beneath vectors
             const readout = document.getElementById('radar-readout');
@@ -91,6 +101,44 @@ function updateSensor() {
 // 150ms execution window generates high refresh speeds for safety alerts
 setInterval(updateSensor, 150);
 updateSensor(); // Instant baseline loop invocation
+
+/**
+ * Speed Governor State Engine.
+ * Handles the UI interactions for the max thrust limit buttons and dispatches
+ * configuration settings to the ROS 2 Web Server.
+ */
+document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        // 1. Reset all buttons to default dark styling
+        document.querySelectorAll('.speed-btn').forEach(b => {
+            b.classList.remove('active');
+            b.style.background = '#333';
+            b.style.color = 'white';
+            b.style.borderColor = '#666';
+            b.style.fontWeight = 'normal';
+        });
+
+        // 2. Highlight the newly clicked button
+        const targetBtn = e.target;
+        targetBtn.classList.add('active');
+        targetBtn.style.background = '#00ff88';
+        targetBtn.style.color = 'black';
+        targetBtn.style.borderColor = '#00ff88';
+        targetBtn.style.fontWeight = 'bold';
+
+        // 3. Dispatch the setting to the ROS 2 Web Server
+        const speedLimit = parseFloat(targetBtn.dataset.speed);
+        fetch('/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                type: 'setting', 
+                target: 'max_speed', 
+                value: speedLimit 
+            })
+        });
+    });
+});
 
 /**
  * Initializes the live MJPEG camera stream.
@@ -121,6 +169,9 @@ function sendCommand(type, value) {
 }
 
 // === Asynchronous Multi-Touch State Engine ===
+let activeThrust = null;
+let thrustInterval = null;
+
 let activeSteering = null;
 let steerInterval = null;
 
@@ -138,7 +189,13 @@ const handleDown = (e) => {
         steerInterval = setInterval(() => sendCommand('direction', dir), 80);
     } else if (btn.classList.contains('thrust-btn')) {
         const action = btn.dataset.thrust;
+        if (activeThrust === action) return;
+        activeThrust = action;
         sendCommand('throttle', action);
+        
+        // Loop execution while pointer maintains active state prevents command drops
+        clearInterval(thrustInterval);
+        thrustInterval = setInterval(() => sendCommand('throttle', action), 80);
     }
 };
 
@@ -152,8 +209,12 @@ const handleUp = (e) => {
             activeSteering = null;
         }
     } else if (btn.classList.contains('thrust-btn')) {
-        // Releasing a drive button naturally cuts power and triggers neutral brake state
-        sendCommand('throttle', 'stop'); 
+        if (activeThrust) {
+            clearInterval(thrustInterval);
+            // Releasing a drive button naturally cuts power and triggers neutral brake state
+            sendCommand('throttle', 'stop');
+            activeThrust = null;
+        }
     }
 };
 

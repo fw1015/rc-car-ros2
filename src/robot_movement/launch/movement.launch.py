@@ -5,14 +5,8 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='robot_movement',
-            executable='servo_node',
-            name='servo_node',
-            output='screen',
-        ),
-        Node(
-            package='robot_movement',
-            executable='esc_node',
-            name='esc_node',
+            executable='i2c_manager',
+            name='i2c_manager',
             output='screen',
         )
     ])

@@ -12,10 +12,10 @@ from robot_movement.srv import SetESCServo
 
 class I2CManager(Node):
     """
-    Dedicated Motor Controller Node.
+    Dedicated Motor Controller Node
     
     Handles the PCA9685 PWM driver over I2C to control the ESC (Throttle) 
-    and Servo (Steering) via ROS 2 service calls.
+    and Servo (Steering) via ROS 2 service calls
     """
 
     def __init__(self):
@@ -35,21 +35,22 @@ class I2CManager(Node):
         self.esc_initialized = False
 
         # Hardware connection retry loop (executes every 2 seconds until powered)
+        # This allows the system to start up even if the ESC power is delayed (as it needs to be turned on manually)
         self.esc_retry_timer = self.create_timer(2.0, self.try_init_esc_servo)
         self.get_logger().info("I2C Manager started. Waiting for ESC power if needed.")
 
     def _set_pwm_pulse(self, channel, pulse_us):
         """
-        Safely converts a microsecond pulse into a 16-bit hardware duty cycle.
+        Safely converts a microsecond pulse into a 16-bit hardware duty cycle
         
         Args:
-            channel (int): The PCA9685 channel (0-15).
-            pulse_us (float): The desired PWM pulse width in microseconds.
+            channel (int): The PCA9685 channel (0-15)
+            pulse_us (float): The desired PWM pulse width in microseconds
         """
         if self.pca is None:
             return
             
-        # Hardware safety clamp: Prevent sending signals outside standard RC limits
+        # Hardware safety clamp - Prevent sending signals outside standard RC limits
         pulse_us = max(900, min(2100, pulse_us))
         
         # Convert microsecond pulse to 16-bit duty cycle at 50Hz (20,000us period)
@@ -57,14 +58,14 @@ class I2CManager(Node):
         self.pca.channels[channel].duty_cycle = duty
 
     def try_init_esc_servo(self):
-        """Attempts to connect to the PCA9685 and arm the motors."""
+        """Attempts to connect to the PCA9685 and arm the motors"""
         if self.esc_initialized:
             return
             
         try:
-            # Initialize bare-metal chip
+            # Initialize chip
             self.pca = PCA9685(self.i2c_esc)
-            self.pca.frequency = 50  # Must be exactly 50Hz for standard RC equipment
+            self.pca.frequency = 50  # 50Hz for standard RC equipment
             
             # CHANNEL 0: Arm the ESC (1500us Neutral)
             self._set_pwm_pulse(0, 1500) # Neutral 1500us
@@ -83,8 +84,8 @@ class I2CManager(Node):
 
     def set_esc_servo_callback(self, request, response):
         """
-        Service callback to actuate physical hardware.
-        Maps incoming float values (-1.0 to 1.0) to physical PWM microseconds.
+        Service callback to actuate physical hardware
+        Maps incoming float values (-1.0 to 1.0) to physical PWM microseconds
         """
         if not self.esc_initialized or self.pca is None:
             response.success = False

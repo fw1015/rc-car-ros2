@@ -7,13 +7,13 @@ import vl53l5cx_ctypes as vl53l5cx
 
 class TofSensorPublisher(Node):
     """
-    Hardware driver node for the VL53L5CX Time-of-Flight sensor.
+    Hardware driver node for the VL53L5CX Time-of-Flight sensor
     
     Responsibilities:
-    - Initializes the I2C ToF sensor in 4x4 grid resolution mode.
-    - Polls the hardware synchronously at 10Hz.
-    - Applies spatial clustering (neighbor check) to the center 4 zones to filter noise.
-    - Publishes the final reliable distance in meters to the `/tof/distance` topic.
+    - Initializes the I2C ToF sensor in 4x4 grid resolution mode
+    - Polls the hardware synchronously at 10Hz
+    - Applies spatial clustering (neighbor check) to the center 4 zones to filter noise
+    - Publishes the final reliable distance in meters to the `/tof/distance` topic
     """
 
     def __init__(self):
@@ -25,13 +25,13 @@ class TofSensorPublisher(Node):
         self.tof = None
         self.init_tof_sensor()
 
-        # Timer to read the sensor at 10 Hz (must match the hardware ranging frequency)
+        # Timer to read the sensor at 10 Hz
         self.timer = self.create_timer(0.1, self.timer_callback)
 
         self.get_logger().info('ToF Sensor Node started (Standalone)')
 
     def init_tof_sensor(self):
-        """Attempts to initialize the bare-metal VL53L5CX sensor over I2C."""
+        """Attempts to initialize the VL53L5CX sensor over I2C"""
         try:
             self.tof = vl53l5cx.VL53L5CX()
             self.tof.set_resolution(4*4)
@@ -43,10 +43,8 @@ class TofSensorPublisher(Node):
             self.tof = None
 
     def timer_callback(self):
-        """
-        Main sensor polling loop. Retrieves the raw 4x4 distance grid, isolates 
-        the forward-facing path, applies noise filtering, and publishes the result.
-        """
+        """Main sensor polling loop. Retrieves the raw 4x4 distance grid, isolates 
+        the forward-facing path, applies noise filtering, and publishes the result"""
         # Publish safe default (4.0m) if the sensor hardware is dead or disconnected
         if self.tof is None:
             msg = Float64()
@@ -61,7 +59,7 @@ class TofSensorPublisher(Node):
                 statuses = list(data.target_status[0])
                 
                 # 1. Isolate the center 4 zones of the 4x4 grid
-                # Indices 5, 6, 9, 10 form the exact physical center of the FOV.
+                # Indices 5, 6, 9, 10 form the exact physical center of the FOV
                 center_zones = [5, 6, 9, 10]
                 center_dists = {}
 
@@ -74,7 +72,7 @@ class TofSensorPublisher(Node):
 
                 # 2. Spatial Clustering: The "Neighbor Check"
                 # To prevent phantom braking from stray reflections, a distance point is 
-                # only considered valid if an adjacent zone agrees within 150mm (15cm).
+                # only considered valid if an adjacent zone agrees within 150mm (15cm)
                 for zone_index, dist in center_dists.items():
                     has_neighbor = any(
                         abs(dist - other_dist) < 150 
@@ -88,7 +86,7 @@ class TofSensorPublisher(Node):
                 msg = Float64()
                 if valid_obstacle_dists:
                     # Return the closest verified threat, converted from mm to meters
-                    msg.data = min(valid_obstacle_dists) / 1000.0  # Convert to meters
+                    msg.data = min(valid_obstacle_dists) / 1000.0
                 else:
                     msg.data = 4.0
                     

@@ -7,12 +7,12 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 class RobotBrainNode(Node):
     """
-    Central decision-making node for the autonomous RC vehicle.
+    Central decision-making node for the RC Car
     
     Responsibilities:
-    - Receives raw movement commands from the web interface.
-    - Applies sensor-fusion logic (obstacle avoidance) to calculate safe velocities.
-    - Forwards validated commands to the I2C Manager via service calls.
+    - Receives raw movement commands from the web interface (from user)
+    - Applies sensor-fusion logic (obstacle avoidance) to calculate safe velocities and braking logics
+    - Forwards validated commands to the I2C Manager via service calls
     - Enforces a dead-man's switch safety timeout to halt the vehicle on connection loss.
     """
 
@@ -29,23 +29,23 @@ class RobotBrainNode(Node):
         # Publisher for adjusted commands after processing in the Robot Brain
         self.adjusted_publisher = self.create_publisher(Twist, '/cmd_vel_adjusted', 10)
 
-        # Subscriptions
+        # Subscriptions to sensor data and raw commands
         self.create_subscription(Float64, '/tof/distance', self.front_dist_callback, 10)
         self.create_subscription(Twist, '/cmd_vel_raw', self.move_cmd_callback, qos_profile)
 
-        # Service Clients
+        # Service Clients to send commands to the I2C Manager
         self.esc_servo_client = self.create_client(SetESCServo, 'set_esc_servo')
 
-        # State memory
+        # State memory for sensor readings and last commands (used for safety checks and active braking)
         self.front_distance = None
         self.last_raw_throttle = 0.0
         self.last_adjusted_throttle = 0.0
         self.last_steering = 0.0
 
-        # Asynchronous timer for Active Braking
+        # Asynchronous timer for Active Braking (used to release brakes after a timed duration)
         self.brake_timer = None
 
-        # Safety Timer
+        # Safety Timer to detect loss of command input (e.g., web interface disconnect)
         self.last_cmd_time = self.get_clock().now()
         self.safety_active = False
         self.create_timer(0.2, self.safety_check)
@@ -54,8 +54,8 @@ class RobotBrainNode(Node):
 
     def front_dist_callback(self, msg: Float64):
         """Updates the internal state with the true bumper-to-obstacle distance."""
-        # Hardware Offset: Sensor is 22mm (0.022m) behind the physical front bumper.
-        # Subtract 0.022m, clamping at 0.0 to prevent negative distances.
+        # Hardware Offset: Sensor is 22mm (0.022m) behind the physical front bumper
+        # Subtract 0.022m, clamping at 0.0 to prevent negative distances
         self.front_distance = max(0.0, msg.data - 0.022)
 
         if self.last_raw_throttle > 0.0:
@@ -64,10 +64,8 @@ class RobotBrainNode(Node):
             self.sensor_control_adjust(temp_msg)
 
     def move_cmd_callback(self, msg: Twist):
-        """
-        Processes incoming joystick commands, applies safety adjustments, 
-        and dispatches them to the motor controller.
-        """
+        """Processes incoming joystick commands, 
+        applies safety adjustments, and dispatches them to the motor controller"""
         self.last_cmd_time = self.get_clock().now()
         self.safety_active = False
 
@@ -80,10 +78,8 @@ class RobotBrainNode(Node):
             self.last_steering = msg.angular.z
 
     def sensor_control_adjust(self, msg: Twist):
-        """
-        Dynamic Obstacle Avoidance: Enforces a 1.5-meter Deceleration Zone 
-        where forward throttle is linearly clamped based on true bumper distance.
-        """
+        """Dynamic Obstacle Avoidance: Enforces a 1.5-meter Deceleration Zone 
+        where forward throttle is linearly clamped based on true bumper distance"""
         adjusted_throttle = msg.linear.x
         
         # Only apply safety brakes if the user is trying to drive FORWARD
@@ -95,13 +91,13 @@ class RobotBrainNode(Node):
                 self.get_logger().warn(f"🚧 Wall at {self.front_distance:.2f}m! Emergency Stop.")
                 
             # 2. DECELERATION ZONE (<= 1.50 meter)
-            # Spreadsheet mapping: Throttle = Distance / 3.0 (e.g., 1.5m = 0.50, 0.3m = 0.10)
+            # Adjusted Throttle = Distance / 3.0 (e.g., 1.5m = 0.50, 0.3m = 0.10)
             elif self.front_distance <= 1.50: 
                 max_allowed_throttle = self.front_distance / 3.5
                 if adjusted_throttle > max_allowed_throttle:
                     adjusted_throttle = max_allowed_throttle
                     
-        # SPAM FILTER & BRAKE ROUTING
+        # 3. SPAM FILTER & BRAKE LOGIC
         if adjusted_throttle != self.last_adjusted_throttle:
             
             # ACTIVE BRAKING
@@ -112,7 +108,7 @@ class RobotBrainNode(Node):
                     self.brake_timer.cancel()
                     self.brake_timer = None
                 
-                # DEADBAND BOOST: minimum crawl speed as 0.15 to prevent stalling in tight maneuvers (e.g., 0.10 → 0.15)
+                # DEADBAND BOOST - minimum crawl speed as 0.15 to prevent stalling in tight maneuvers
                 if 0.0 < adjusted_throttle < 0.15:
                     adjusted_throttle = 0.15
 
@@ -127,18 +123,15 @@ class RobotBrainNode(Node):
             self.last_adjusted_throttle = adjusted_throttle
 
     def engage_active_brake(self, previous_velocity: float) -> None:
-        """
-        Active Braking: Applies exact negative force with a stepped duration based on velocity.
-        """
+        """Active Braking: Applies 1.5x negative brake force with a stepped duration based on velocity"""
         if self.brake_timer is not None:
             self.brake_timer.cancel()
             self.brake_timer = None
         
-        # 1. FORCE CALCULATION (From Spreadsheet)
-        # Applying exact opposite of previous velocity
+        # 1. FORCE CALCULATION
         brake_force = -previous_velocity * 1.5
         
-        # 2. STEPPED DURATION (From Spreadsheet)
+        # 2. STEPPED DURATION
         # Categorized timers based on how fast the car was going
         abs_vel = abs(previous_velocity)
         if abs_vel <= 0.25:
@@ -158,7 +151,7 @@ class RobotBrainNode(Node):
         self.brake_timer = self.create_timer(brake_duration, self.release_brake)
 
     def release_brake(self) -> None:
-        """Returns the ESC to absolute neutral coasting."""
+        """Returns the ESC to absolute neutral"""
         self.send_command(channel=0, value=0.0)
         self.get_logger().info("⚪ Brakes Released -> Neutral Coast")
         
@@ -167,7 +160,7 @@ class RobotBrainNode(Node):
             self.brake_timer = None
 
     def send_command(self, channel: int, value: float):
-        """Asynchronously dispatches hardware commands via the SetESCServo service."""
+        """Asynchronously dispatches hardware commands via the SetESCServo service"""
         if not self.esc_servo_client.service_is_ready():
             self.get_logger().warn('I2CManager service not ready yet')
             return
@@ -180,7 +173,7 @@ class RobotBrainNode(Node):
         future.add_done_callback(self.service_response_callback)
 
     def service_response_callback(self, future):
-        """Handles the response from the I2C Manager (Logs failures only)."""
+        """Handles the response from the I2C Manager (Logs failures only)"""
         try:
             response = future.result()
             if not response.success:
@@ -189,10 +182,8 @@ class RobotBrainNode(Node):
             self.get_logger().error(f'Service call failed: {e}')
 
     def safety_check(self):
-        """
-        Watchdog Timer: Halts the vehicle if the web interface disconnects 
-        or stops sending commands for more than 0.5 seconds.
-        """
+        """Watchdog Timer - Halts the vehicle if the web interface disconnects 
+        or stops sending commands for more than 0.5 seconds"""
         time_since_last = (self.get_clock().now() - self.last_cmd_time).nanoseconds / 1e9
 
         if time_since_last > 0.5:
@@ -204,7 +195,7 @@ class RobotBrainNode(Node):
             self.send_command(channel=0, value=0.0)
             self.send_command(channel=2, value=0.0)
 
-            # Reset local state to ensure next command passes the spam filter
+            # Reset local state 
             self.last_raw_throttle = 0.0
             self.last_adjusted_throttle = 0.0
             self.last_steering = 0.0

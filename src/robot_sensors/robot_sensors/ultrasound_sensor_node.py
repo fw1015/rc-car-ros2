@@ -8,12 +8,12 @@ from gpiozero import DistanceSensor
 
 class UltrasoundSensorNode(Node):
     """
-    Hardware driver node for side-facing HC-SR04 ultrasonic sensors.
+    Hardware driver node for side-facing HC-SR04 ultrasonic sensors
 
     Responsibilities:
-    - Interfaces with left and right HC-SR04 sensors via direct Pi GPIO.
-    - Applies a rolling median temporal filter to eliminate acoustic noise and ghost echoes.
-    - Publishes reliable distance data as standard ROS 2 Range messages.
+    - Interfaces with left and right HC-SR04 sensors via direct Pi GPIO
+    - Applies a rolling median temporal filter to eliminate acoustic noise and ghost echoes
+    - Publishes reliable distance data as standard ROS 2 Range messages
     """
 
     def __init__(self):
@@ -39,9 +39,7 @@ class UltrasoundSensorNode(Node):
         self.get_logger().info("✅ Ultrasound Sensor Node Started (Left + Right)")
 
     def create_range_msg(self, distance_m: float, frame_id: str) -> Range:
-        """
-        Helper function to create a properly formatted Range message.
-        """
+        """Helper function to create a properly formatted Range message"""
         msg = Range()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = frame_id
@@ -54,11 +52,11 @@ class UltrasoundSensorNode(Node):
 
     def publish_distances(self):
         try:
-            # 1. Grab raw distance in meters
+            # 1. Grab raw distance
             raw_left = self.sensor_left.distance
             raw_right = self.sensor_right.distance
 
-            # 2. Cull Out-of-Bounds Garbage Data
+            # 2. Remove Out-of-Bounds Data
             # Only add to history if the reading is physically possible (2cm to 400cm)
             if 0.02 <= raw_left <= 4.0:
                 self.left_history.append(raw_left)

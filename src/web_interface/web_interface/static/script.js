@@ -3,8 +3,8 @@
 // ==========================================================
 
 /**
- * Initializes the system connectivity feedback banner.
- * @param {string} text - The status message to display.
+ * Initializes the system connectivity feedback banner
+ * @param {string} text - The status message to display
  */
 function setStatus(text) {
     document.getElementById('status').textContent = text;
@@ -12,12 +12,12 @@ function setStatus(text) {
 setStatus('Connected ✅');
 
 /**
- * Dynamically updates the SVG proximity radar and full-screen warning overlays.
- * Applies color-coded safety constraints based on sensor distance.
- * * @param {number} distance - Distance in centimeters.
- * @param {string} coneId - DOM ID of the SVG cone element.
- * @param {string} warningId - DOM ID of the screen edge warning overlay.
- * @returns {Object} State object containing the `isDanger` boolean.
+ * Dynamically updates the SVG proximity radar and full-screen warning overlays
+ * Applies color-coded safety constraints based on sensor distance
+ * @param {number} distance - Distance in centimeters
+ * @param {string} coneId - DOM ID of the SVG cone element
+ * @param {string} warningId - DOM ID of the screen edge warning overlay
+ * @returns {Object} State object containing the `isDanger` boolean
  */
 function updateRadarUI(distance, coneId, warningId) {
     const cone = document.getElementById(coneId);
@@ -53,8 +53,8 @@ function updateRadarUI(distance, coneId, warningId) {
 }
 
 /**
- * Asynchronous Telemetry Poller.
- * Fetches real-time sensor data from the Flask backend and updates the UI.
+ * Asynchronous Telemetry Poller
+ * Fetches real-time sensor data from the Flask backend and updates the UI
  */
 function updateSensor() {
     fetch('/sensor_data')
@@ -103,9 +103,9 @@ setInterval(updateSensor, 150);
 updateSensor(); // Instant baseline loop invocation
 
 /**
- * Speed Governor State Engine.
+ * Speed Governor State Engine
  * Handles the UI interactions for the max thrust limit buttons and dispatches
- * configuration settings to the ROS 2 Web Server.
+ * configuration settings to the ROS 2 Web Server
  */
 document.querySelectorAll('.speed-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -141,8 +141,8 @@ document.querySelectorAll('.speed-btn').forEach(btn => {
 });
 
 /**
- * Initializes the live MJPEG camera stream.
- * Dynamically resolves the host IP to prevent CORS and hardcoding issues.
+ * Initializes the live MJPEG camera stream
+ * Dynamically resolves the host IP to prevent CORS and hardcoding issues
  */
 function initCamera() {
     const cam = document.getElementById('camera-feed');
@@ -155,10 +155,10 @@ function initCamera() {
 initCamera();
 
 /**
- * Synchronous Command Transmission Handler.
- * Dispatches JSON hardware commands to the Flask web server.
- * * @param {string} type - The command type ('direction' or 'throttle').
- * @param {string} value - The requested state ('left', 'right', 'forward', 'reverse', 'stop').
+ * Synchronous Command Transmission Handler
+ * Dispatches JSON hardware commands to the Flask web server
+ * @param {string} type - The command type ('direction' or 'throttle')
+ * @param {string} value - The requested state ('left', 'right', 'forward', 'reverse', 'stop')
  */
 function sendCommand(type, value) {
     fetch('/command', {
@@ -168,7 +168,9 @@ function sendCommand(type, value) {
     });
 }
 
-// === Asynchronous Multi-Touch State Engine ===
+/**
+ * Asynchronous Multi-Touch State Engine
+ */
 let activeThrust = null;
 let thrustInterval = null;
 

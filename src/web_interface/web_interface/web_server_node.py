@@ -11,13 +11,13 @@ import requests
 
 class WebServerNode(Node):
     """
-    Teleoperation Web Server Node.
+    Teleoperation Web Server Node
 
     Responsibilities:
-    - Hosts the Flask web dashboard serving the HTML/JS/CSS frontend.
-    - Subscribes to hardware sensor topics and serves telemetry via JSON endpoints.
-    - Proxies the MJPEG camera stream from web_video_server.
-    - Receives HTTP POST commands from the web UI and publishes them as ROS 2 Twist messages.
+    - Hosts the Flask web dashboard serving the HTML/JS/CSS frontend
+    - Subscribes to hardware sensor topics and serves telemetry via JSON endpoints
+    - Proxies the MJPEG camera stream from web_video_server
+    - Receives HTTP POST commands from the web UI and publishes them as ROS 2 Twist messages
     """
 
     def __init__(self):
@@ -57,16 +57,16 @@ class WebServerNode(Node):
 
     
     def _setup_flask_routes(self):
-        """Configures all HTTP endpoints for the Flask application."""
+        """Configures all HTTP endpoints for the Flask application"""
 
         @self.app.route('/')
         def index():
-            """Serves the main teleoperation dashboard."""
+            """Serves the main teleoperation dashboard"""
             return render_template('index.html')
 
         @self.app.route('/sensor_data')
         def sensor_data():
-            """Provides real-time telemetry data to the frontend UI."""
+            """Provides real-time telemetry data to the frontend UI"""
             return jsonify({
                 'front': self.latest_front_distance,
                 'left': self.latest_left_distance,
@@ -79,7 +79,7 @@ class WebServerNode(Node):
 
         @self.app.route('/camera_stream')
         def camera_stream():
-            """Proxies the MJPEG stream from the local web_video_server to avoid CORS issues."""
+            """Proxies the MJPEG stream from the local web_video_server to avoid CORS issues"""
             def generate():
                 try:
                     r = requests.get(
@@ -98,7 +98,7 @@ class WebServerNode(Node):
 
         @self.app.route('/command', methods=['POST'])
         def command():
-            """Receives touch-screen joystick commands, accumulates them, and publishes Twist."""
+            """Receives touch-screen commands, accumulates and publishes Twist"""
             data = request.get_json()
             cmd_type = data.get('type')
             value = data.get('value')
@@ -111,7 +111,7 @@ class WebServerNode(Node):
                     if abs(self.thrust) > self.thrust_max:
                         self.thrust = self.thrust_max if self.thrust > 0 else -self.thrust_max
                     
-                    self.get_logger().info(f'⚙️ Speed Governor updated to: {self.thrust_max:.2f}')
+                    self.get_logger().info(f'Speed Governor updated to: {self.thrust_max:.2f}')
                     return jsonify({'status': 'ok'})
 
             # Update Steering State
@@ -123,6 +123,7 @@ class WebServerNode(Node):
                     steering_count = self.steering - self.steering_step
                     self.steering = max(-1.0, steering_count)
                 elif value == 'stop':
+                    # Snaps the steering back to a 1500us neutral pulse
                     self.steering = 0.0
                 
             # Update Throttle State
@@ -146,35 +147,35 @@ class WebServerNode(Node):
             return jsonify({'status': 'ok'})
 
     def adjusted_callback(self, msg):
-        """Update adjusted command values."""
+        """Update adjusted command values"""
         self.adj_thrust = msg.linear.x
         self.adj_steering = msg.angular.z
 
     def front_callback(self, msg):
-        """Update latest front distance from ToF sensor (Convert to cm for UI)."""
+        """Update latest front distance from ToF sensor (Convert to cm for UI)"""
         distance_cm = msg.data * 100
         self.latest_front_distance = distance_cm
         self.get_logger().info(f'Front Distance: {distance_cm:.1f} cm')
 
     def left_callback(self, msg):
-        """Update latest left distance from ultrasonic sensor (Convert to cm for UI)."""
+        """Update latest left distance from ultrasonic sensor (Convert to cm for UI)"""
         distance_cm = max(0.0, msg.range * 100 - 7)
         self.latest_left_distance = distance_cm
         self.get_logger().info(f'Left Distance: {distance_cm:.1f} cm')
 
     def right_callback(self, msg):
-        """Update latest right distance from ultrasonic sensor (Convert to cm for UI)."""
+        """Update latest right distance from ultrasonic sensor (Convert to cm for UI)"""
         distance_cm = max(0.0, msg.range * 100 - 7)
         self.latest_right_distance = distance_cm
         self.get_logger().info(f'Right Distance: {distance_cm:.1f} cm')
 
     def run_flask(self):
-        """Blocking call to start the Flask server. Must be run in a separate thread."""
+        """Blocking call to start the Flask server. Must be run in a separate thread"""
         self.get_logger().info('Web server started → http://192.168.0.30:5000')
         self.app.run(host='0.0.0.0', port=5000, debug=False)
 
     def start(self):
-        """Spawns the Flask web server in a background daemon thread."""
+        """Spawns the Flask web server in a background daemon thread"""
         self.server_thread = threading.Thread(target=self.run_flask, daemon=True)
         self.server_thread.start()
 

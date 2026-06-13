@@ -43,8 +43,9 @@ class TofSensorPublisher(Node):
             self.tof = None
 
     def timer_callback(self):
-        """Main sensor polling loop. Retrieves the raw 4x4 distance grid, isolates 
-        the forward-facing path, applies noise filtering, and publishes the result"""
+        """Main sensor polling loop. Creates a horizontal 'letterbox' field of view 
+        to ignore ground/bumper reflections while detecting wide or thin forward obstacles."""
+        
         # Publish safe default (4.0m) if the sensor hardware is dead or disconnected
         if self.tof is None:
             msg = Float64()
@@ -57,35 +58,32 @@ class TofSensorPublisher(Node):
                 data = self.tof.get_data()
                 distances = list(data.distance_mm[0])
                 statuses = list(data.target_status[0])
+
+                # --- TEMPORARY DEBUG VISUALIZER ---
                 
-                # 1. Isolate the center 4 zones of the 4x4 grid
-                # Indices 5, 6, 9, 10 form the exact physical center of the FOV
-                center_zones = [5, 6, 9, 10]
-                center_dists = {}
-
-                for i in center_zones:
-                    # Statuses 5 and 9 are VL53L5CX hardware codes for "Range Valid"
-                    if statuses[i] in (5, 9) and distances[i] > 0:
-                        center_dists[i] = distances[i]
-
+                grid = [distances[i:i+4] for i in range(0, 16, 4)]
+                stat_grid = [statuses[i:i+4] for i in range(0, 16, 4)]
+                self.get_logger().info(
+                    f"\nDISTANCES:\nRow 1 [4-7]:   {grid[1]}\n"
+                    f"STATUSES:\nRow 1 [4-7]:   {stat_grid[1]}\n------------------------"
+                )
+                # ----------------------------------
+                # ----------------------------------
+                
+                # 1. NARROW HORIZONTAL FOV (The "Blinders")
+                horizon_zones = [5, 6]
                 valid_obstacle_dists = []
 
-                # 2. Spatial Clustering: The "Neighbor Check"
-                # To prevent phantom braking from stray reflections, a distance point is 
-                # only considered valid if an adjacent zone agrees within 150mm (15cm)
-                for zone_index, dist in center_dists.items():
-                    has_neighbor = any(
-                        abs(dist - other_dist) < 150 
-                        for other_index, other_dist in center_dists.items() 
-                        if other_index != zone_index
-                    )
-                    if has_neighbor:
-                        valid_obstacle_dists.append(dist)
+                # 2. Extract valid distances (Relaxed for Outdoors)
+                for i in horizon_zones:
+                    # 5 & 9 = Perfect valid reading
+                    # 6, 10, 12 = Warning readings (Extremely common outdoors due to sunlight IR interference)
+                    if statuses[i] in (5, 6, 9, 10, 12) and distances[i] > 0:
+                        valid_obstacle_dists.append(distances[i])
 
                 # 3. Calculate Final Safe Distance and Publish
                 msg = Float64()
                 if valid_obstacle_dists:
-                    # Return the closest verified threat, converted from mm to meters
                     msg.data = min(valid_obstacle_dists) / 1000.0
                 else:
                     msg.data = 4.0

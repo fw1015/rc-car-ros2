@@ -7,6 +7,7 @@ from std_msgs.msg import Float64
 from sensor_msgs.msg import Range
 from geometry_msgs.msg import Twist
 import requests
+import subprocess
 
 
 class WebServerNode(Node):
@@ -145,6 +146,21 @@ class WebServerNode(Node):
 
             self.publisher.publish(twist)
             return jsonify({'status': 'ok'})
+        
+        @self.app.route('/shutdown', methods=['POST'])
+        def shutdown_system():
+            """Triggers complete hardware shutdown of the Raspberry Pi"""
+            try:
+                self.get_logger().warn("HARDWARE SHUTDOWN command received from web interface!")
+
+                subprocess.Popen('sleep 2 && sudo /sbin/poweroff', shell=True)
+
+                self.get_logger().info("Poweroff sequence initiated. System will halt in 2 seconds.")
+                return jsonify({'status': 'ok'})
+
+            except Exception as e:
+                self.get_logger().error(f"Exception during shutdown: {e}")
+                return jsonify({'status': 'error', 'message': str(e)}), 500
 
     def adjusted_callback(self, msg):
         """Update adjusted command values"""

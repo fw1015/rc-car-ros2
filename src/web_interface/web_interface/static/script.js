@@ -2,14 +2,107 @@
 // RC Robot Vehicle Teleoperation & Dashboard Interface Module
 // ==========================================================
 
+const PI_IP = window.location.hostname;
+const statusState = document.getElementById('connection-state');
+const statusMetrics = document.getElementById('connection-metrics');
+let isSystemHalted = false; // Prevents pinging a dead system
+
 /**
- * Initializes the system connectivity feedback banner
- * @param {string} text - The status message to display
+ * Asynchronous Connection Speed Tracker
  */
-function setStatus(text) {
-    document.getElementById('status').textContent = text;
+async function checkConnectionSpeed() {
+    if (isSystemHalted) return;
+    
+    const startTime = performance.now();
+    try {
+        // Ping the Pi's video server with a cache-busting timestamp
+        await fetch(`http://${PI_IP}:8080/?t=${startTime}`, { method: 'HEAD', mode: 'no-cors' });
+        
+        const endTime = performance.now();
+        const latency = Math.round(endTime - startTime); 
+        
+        updateConnectionUI(latency);
+        
+    } catch (error) {
+        statusState.textContent = "DISCONNECTED";
+        statusMetrics.textContent = "(-- ms)";
+        statusState.className = "status-disconnected";
+    }
 }
-setStatus('Connected ✅');
+
+function updateConnectionUI(latency) {
+    if (latency < 20) {
+        statusState.textContent = "EXCELLENT";
+        statusState.className = "status-excellent";
+    } else if (latency < 60) {
+        statusState.textContent = "GOOD";
+        statusState.className = "status-good";
+    } else if (latency < 150) {
+        statusState.textContent = "LAGGY";
+        statusState.className = "status-laggy";
+    } else {
+        statusState.textContent = "CRITICAL DELAY";
+        statusState.className = "status-critical";
+    }
+    statusMetrics.textContent = `(${latency} ms)`;
+}
+
+// Check connection speed every 2 seconds
+setInterval(checkConnectionSpeed, 2000);
+checkConnectionSpeed();
+
+
+/**
+ * Hardware Shutdown Logic
+ */
+const shutdownBtn = document.getElementById('shutdown-btn');
+
+if (shutdownBtn) {
+    shutdownBtn.addEventListener('click', () => {
+        const confirmed = confirm(
+            "⚠️ HARDWARE SHUTDOWN WARNING\n\n" +
+            "This will completely POWER OFF the Raspberry Pi.\n" +
+            "You will lose video and control immediately, and you must physically toggle the car's power switch to restart it.\n\n" +
+            "Are you sure you want to shut down?"
+        );
+
+        if (confirmed) {
+            shutdownBtn.disabled = true;
+            shutdownBtn.style.background = '#666';
+            shutdownBtn.innerHTML = '…';
+
+            fetch('/shutdown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    isSystemHalted = true;
+                    statusState.textContent = 'SYSTEM HALTED ⚡';
+                    statusState.className = 'status-critical';
+                    statusMetrics.textContent = '';
+                    alert("Powering off the vehicle.\nIt is now safe to unplug the battery.");
+                } else {
+                    alert("Failed to shutdown: " + (data.message || "Unknown error"));
+                    shutdownBtn.disabled = false;
+                    shutdownBtn.style.background = '#ff4444';
+                    shutdownBtn.innerHTML = '⏻';
+                }
+            })
+            .catch(err => {
+                console.error("Shutdown request failed:", err);
+                alert("Could not reach the server. The car may have already powered off.");
+                shutdownBtn.disabled = true;
+                
+                isSystemHalted = true;
+                statusState.textContent = 'OFFLINE';
+                statusState.className = 'status-disconnected';
+                statusMetrics.textContent = '';
+            });
+        }
+    });
+}
 
 /**
  * Dynamically updates the SVG proximity radar and full-screen warning overlays

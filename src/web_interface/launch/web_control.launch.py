@@ -28,7 +28,7 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 4. Tof Sensor Node (Throttle)
+        # 4. Tof Sensor Node (Front Sensor)
         Node(
             package='robot_sensors',
             executable='tof_sensor_node',
@@ -36,7 +36,7 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 5. Ultrasonic Sensor Node (Throttle)
+        # 5. Ultrasonic Sensor Node (Side Sensors)
         Node(
             package='robot_sensors',
             executable='ultrasound_sensor_node',
@@ -56,7 +56,7 @@ def generate_launch_description():
                 {'height': 480},
                 {'frame_rate': 15},
                 {'use_compressed': True},
-                {'camera': '/base/axi/pcie@120000/rp1/i2c@80000/imx708@1a'},   # Force camera
+                {'camera': '/base/axi/pcie@120000/rp1/i2c@80000/imx708@1a'},
             ],
             arguments=['--ros-args', '--log-level', 'info']
         ),

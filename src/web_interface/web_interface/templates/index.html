@@ -28,7 +28,7 @@
             <div>SRV ADJ:   <span id="db-servo-adjusted" style="color: #00ff88;">0.00</span></div>
         </div>
 
-        <div style="position: absolute; top: 60px; right: 20px; background: rgba(0, 0, 0, 0.7); padding: 10px; border-radius: 8px; border: 1px solid #444; z-index: 1000; font-family: monospace;">
+        <div style="position: absolute; top: 90px; right: 15px; background: rgba(0, 0, 0, 0.7); padding: 10px; border-radius: 8px; border: 1px solid #444; z-index: 1000; font-family: monospace;">
             <div style="color: #00ff88; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; text-align: center; letter-spacing: 1px;">Max Thrust Limit</div>
             <div style="display: flex; gap: 5px;">
                 <button class="speed-btn" data-speed="0.25" style="background: #333; color: white; border: 1px solid #666; padding: 5px 10px; cursor: pointer; border-radius: 4px;">25%</button>
@@ -73,7 +73,11 @@
         </div>
 
         <div class="status-card">
-            <div class="status-text" id="status">Connecting...</div>
+            <div id="connection-status-container" class="connection-status">
+                <span id="connection-state">Checking...</span>
+                <span id="connection-metrics">(-- ms)</span>
+            </div>
+            <button id="shutdown-btn" class="shutdown-btn" title="Shutdown RC Car System">⏻</button>
         </div>
     </div>
 

@@ -193,8 +193,74 @@ html, body {
     top: 15px;
     right: 15px;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 14px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+}
+
+.connection-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-family: monospace;
+    margin-right: 5px;
+    min-width: 90px;
+}
+
+#connection-state {
+    font-weight: bold;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    transition: color 0.3s ease;
+}
+
+#connection-metrics {
+    font-size: 11px;
+    color: #aaaaaa;
+}
+
+.status-excellent { color: #00ff88; }
+.status-good { color: #ffaa00; }
+.status-laggy { color: #ff4444; }
+.status-disconnected { color: #888888; }
+
+.status-critical { 
+    color: #ff0000; 
+    font-weight: 900; 
+    animation: ping-flash 1s infinite; 
+}
+
+@keyframes ping-flash {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+.shutdown-btn {
+    background: #ff4444;
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(255, 68, 68, 0.4);
+}
+
+.shutdown-btn:hover {
+    background: #cc0000;
+    transform: scale(1.1);
+}
+
+.shutdown-btn:active {
+    transform: scale(0.95);
 }

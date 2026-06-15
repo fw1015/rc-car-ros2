@@ -5,10 +5,12 @@ from rclpy.node import Node
 from flask import Flask, render_template, jsonify, request, Response
 from std_msgs.msg import Float64
 from sensor_msgs.msg import Range
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, Vector3
 import requests
 import subprocess
-
+import csv
+import time
+import datetime
 
 class WebServerNode(Node):
     """
@@ -26,6 +28,7 @@ class WebServerNode(Node):
         
         # Publisher for raw commands coming from the web interface
         self.publisher = self.create_publisher(Twist, '/cmd_vel_raw', 10)
+        self.pid_publisher = self.create_publisher(Vector3, '/pid_tuning', 10)
         
         # Subscriptions for adjusted commands after processing in the Robot Brain
         self.create_subscription(Twist, '/cmd_vel_adjusted', self.adjusted_callback, 10)
@@ -40,7 +43,7 @@ class WebServerNode(Node):
         self.latest_left_distance = None
         self.latest_right_distance = None
 
-        # Command state
+        # Command State
         self.steering = 0.0
         self.steering_step = 0.15
         self.thrust = 0.0
@@ -49,6 +52,11 @@ class WebServerNode(Node):
         self.adj_thrust = 0.0
         self.adj_steering = 0.0
 
+        # PID State
+        self.kp = 1.0
+        self.ki = 0.0
+        self.kd = 0.5
+
         # Flask App Initialization
         current_dir = os.path.dirname(os.path.abspath(__file__))
         template_dir = os.path.join(current_dir, 'templates')
@@ -56,6 +64,12 @@ class WebServerNode(Node):
 
         self._setup_flask_routes()
 
+        # Telemetry State Variables
+        self.is_logging = False
+        self.csv_file = None
+        self.csv_writer = None
+        
+        self.create_timer(0.1, self.log_telemetry)
     
     def _setup_flask_routes(self):
         """Configures all HTTP endpoints for the Flask application"""
@@ -115,6 +129,21 @@ class WebServerNode(Node):
                     self.get_logger().info(f'Speed Governor updated to: {self.thrust_max:.2f}')
                     return jsonify({'status': 'ok'})
 
+            # Handle PID
+            elif cmd_type == 'pid_tune':
+                self.kp = float(data.get('kp', 1.0))
+                self.ki = float(data.get('ki', 0.0))
+                self.kd = float(data.get('kd', 0.5))
+
+                pid_msg = Vector3()
+                pid_msg.x = self.kp
+                pid_msg.y = self.ki
+                pid_msg.z = self.kd
+                
+                self.pid_publisher.publish(pid_msg)
+                self.get_logger().info(f"Live Tune Relayed -> Kp: {pid_msg.x} | Ki: {pid_msg.y} | Kd: {pid_msg.z}")
+                return jsonify({'status': 'ok'})
+
             # Update Steering State
             elif cmd_type == 'direction':
                 if value == 'left':
@@ -147,6 +176,43 @@ class WebServerNode(Node):
             self.publisher.publish(twist)
             return jsonify({'status': 'ok'})
         
+        @self.app.route('/toggle_logging', methods=['POST'])
+        def toggle_logging():
+            """Starts or stops the CSV telemetry logging dynamically"""
+            data = request.get_json()
+            enable = data.get('enable')
+
+            if enable and not self.is_logging:
+                # START LOGGING: Generate the timestamped file NOW
+                log_dir = '/home/fwann/Documents/Project/ros2_robot_ws/telemetry'
+                os.makedirs(log_dir, exist_ok=True) 
+                
+                current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                file_path = os.path.join(log_dir, f'telemetry_log_{current_time}.csv')
+                
+                self.csv_file = open(file_path, mode='w', newline='')
+                self.csv_writer = csv.writer(self.csv_file)
+                self.csv_writer.writerow([
+                    'Timestamp', 
+                    'Front_cm', 'Left_cm', 'Right_cm', 
+                    'Thrust_Raw', 'Thrust_Adjusted', 'Steering_Raw', 'Steering_Adjusted', 
+                    'Kp', 'Ki', 'Kd'
+                ])
+                
+                self.is_logging = True
+                self.get_logger().info(f"Started logging to {file_path}")
+                return jsonify({'status': 'ok'})
+
+            elif not enable and self.is_logging:
+                # STOP LOGGING: Safely close the file to save the data
+                self.is_logging = False
+                if self.csv_file:
+                    self.csv_file.close()
+                self.get_logger().info("Telemetry logging stopped and saved.")
+                return jsonify({'status': 'ok'})
+
+            return jsonify({'status': 'ignored'})
+
         @self.app.route('/shutdown', methods=['POST'])
         def shutdown_system():
             """Triggers complete hardware shutdown of the Raspberry Pi"""
@@ -194,6 +260,27 @@ class WebServerNode(Node):
         """Spawns the Flask web server in a background daemon thread"""
         self.server_thread = threading.Thread(target=self.run_flask, daemon=True)
         self.server_thread.start()
+
+    def log_telemetry(self):
+        """Logs telemetry data to CSV for offline analysis"""
+        if not self.is_logging or self.csv_writer is None:
+            return
+        
+        timestamp = time.time()
+        self.csv_writer.writerow([
+            timestamp,
+            self.latest_front_distance,
+            self.latest_left_distance,
+            self.latest_right_distance,
+            self.thrust,
+            self.adj_thrust,
+            self.steering,
+            self.adj_steering,
+            self.kp,
+            self.ki,
+            self.kd
+        ])
+        self.csv_file.flush()
 
 
 def main(args=None):

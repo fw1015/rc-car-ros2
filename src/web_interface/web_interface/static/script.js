@@ -146,6 +146,29 @@ function updateRadarUI(distance, coneId, warningId) {
 }
 
 /**
+ * Collapsible Panel Handlers
+ */
+const leftPanel = document.getElementById('left-panel');
+const leftTab = document.getElementById('left-tab');
+
+if (leftTab) {
+    leftTab.addEventListener('click', () => {
+        leftPanel.classList.toggle('collapsed');
+        leftTab.textContent = leftPanel.classList.contains('collapsed') ? '>' : '<';
+    });
+}
+
+const rightPanel = document.getElementById('right-panel');
+const rightTab = document.getElementById('right-tab');
+
+if (rightTab) {
+    rightTab.addEventListener('click', () => {
+        rightPanel.classList.toggle('collapsed');
+        rightTab.textContent = rightPanel.classList.contains('collapsed') ? '<' : '>';
+    });
+}
+
+/**
  * Asynchronous Telemetry Poller
  * Fetches real-time sensor data from the Flask backend and updates the UI
  */
@@ -174,9 +197,9 @@ function updateSensor() {
             // Visual indicator: If Brain Node is overriding the user, highlight it in red
             const adjThrottleEl = document.getElementById('db-throttle-adjusted');
             if (data.throttle_raw !== data.throttle_adjusted) {
-                adjThrottleEl.style.color = '#ff4444'; // Red = Brakes Applied!
+                adjThrottleEl.style.color = '#ff4444';
             } else {
-                adjThrottleEl.style.color = '#00ff88'; // Green = Passthrough OK
+                adjThrottleEl.style.color = '#00ff88';
             }
 
             // 3. Cycle Text Banner state directly beneath vectors
@@ -193,7 +216,47 @@ function updateSensor() {
 }
 // 150ms execution window generates high refresh speeds for safety alerts
 setInterval(updateSensor, 150);
-updateSensor(); // Instant baseline loop invocation
+updateSensor();
+
+/**
+ * Telemetry Recording Toggle
+ * Manages the UI state and triggers the CSV file generation in Python
+ */
+const recordBtn = document.getElementById('record-btn');
+const recordText = document.getElementById('record-text');
+let isRecording = false;
+
+if (recordBtn) {
+    recordBtn.addEventListener('click', () => {
+        const targetState = !isRecording;
+        
+        fetch('/toggle_logging', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enable: targetState })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                isRecording = targetState;
+                if (isRecording) {
+                    recordBtn.classList.add('recording');
+                    recordText.textContent = 'REC: ON';
+                } else {
+                    recordBtn.classList.remove('recording');
+                    recordText.textContent = 'REC: OFF';
+                }
+            } else {
+                console.warn("Server ignored the record request.");
+            }
+        })
+        .catch(err => {
+            console.error("Failed to toggle recording:", err);
+            alert("Network error: Could not reach the car to start/stop recording.");
+        });
+    });
+}
+
 
 /**
  * Speed Governor State Engine
@@ -232,6 +295,49 @@ document.querySelectorAll('.speed-btn').forEach(btn => {
         });
     });
 });
+
+/**
+ * Live PID Tuning State Engine
+ * Grabs values from the UI inputs and dispatches them to the ROS 2 backend
+ */
+const applyPidBtn = document.getElementById('apply-pid-btn');
+
+if (applyPidBtn) {
+    applyPidBtn.addEventListener('click', () => {
+        const kp = parseFloat(document.getElementById('pid-kp').value);
+        const ki = parseFloat(document.getElementById('pid-ki').value);
+        const kd = parseFloat(document.getElementById('pid-kd').value);
+
+        applyPidBtn.style.background = '#00ff88';
+        applyPidBtn.style.color = 'black';
+        applyPidBtn.textContent = 'APPLIED!';
+
+        fetch('/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                type: 'pid_tune', 
+                kp: kp, 
+                ki: ki, 
+                kd: kd 
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Reset button visuals after a short delay
+            setTimeout(() => {
+                applyPidBtn.style.background = '#333';
+                applyPidBtn.style.color = 'white';
+                applyPidBtn.textContent = 'APPLY UPDATE';
+            }, 800);
+        })
+        .catch(err => {
+            console.error("Failed to apply PID tuning:", err);
+            applyPidBtn.style.background = '#ff4444';
+            applyPidBtn.textContent = 'ERROR';
+        });
+    });
+}
 
 /**
  * Initializes the live MJPEG camera stream
@@ -278,8 +384,7 @@ const handleDown = (e) => {
         if (activeSteering === dir) return;
         activeSteering = dir;
         sendCommand('direction', dir);
-        
-        // Loop execution while pointer maintains active state prevents command drops
+
         clearInterval(steerInterval);
         steerInterval = setInterval(() => sendCommand('direction', dir), 80);
     } else if (btn.classList.contains('thrust-btn')) {

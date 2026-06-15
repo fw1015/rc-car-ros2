@@ -12,37 +12,32 @@
 </head>
 <body>
     <div class="container">
-
         <div id="warning-top" class="warning-edge"></div>
         <div id="warning-left" class="warning-edge"></div>
         <div id="warning-right" class="warning-edge"></div>
 
-        <div class="debug-parameters-panel">
-            <div>FRONT: <span id="db-front">---</span></div>
-            <div>LEFT:  <span id="db-left">---</span></div>
-            <div>RIGHT: <span id="db-right">---</span></div>
-            <hr class="debug-divider">
-            <div>THR RAW:   <span id="db-throttle-raw">0.00</span></div>
-            <div>THR ADJ:   <span id="db-throttle-adjusted" style="color: #00ff88;">0.00</span></div>
-            <div>SRV RAW:   <span id="db-servo-raw">0.00</span></div>
-            <div>SRV ADJ:   <span id="db-servo-adjusted" style="color: #00ff88;">0.00</span></div>
-        </div>
-
-        <div style="position: absolute; top: 90px; right: 15px; background: rgba(0, 0, 0, 0.7); padding: 10px; border-radius: 8px; border: 1px solid #444; z-index: 1000; font-family: monospace;">
-            <div style="color: #00ff88; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; text-align: center; letter-spacing: 1px;">Max Thrust Limit</div>
-            <div style="display: flex; gap: 5px;">
-                <button class="speed-btn" data-speed="0.25" style="background: #333; color: white; border: 1px solid #666; padding: 5px 10px; cursor: pointer; border-radius: 4px;">25%</button>
-                <button class="speed-btn" data-speed="0.50" style="background: #333; color: white; border: 1px solid #666; padding: 5px 10px; cursor: pointer; border-radius: 4px;">50%</button>
-                <button class="speed-btn active" data-speed="1.00" style="background: #00ff88; color: black; border: 1px solid #00ff88; padding: 5px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">100%</button>
+        <div id="left-panel" class="side-panel left-panel">
+            <div class="panel-content">
+                <div class="debug-parameters-panel">
+                    <div class="record-control">
+                        <button id="record-btn">
+                            <span id="record-dot" class="dot"></span> <span id="record-text">REC: OFF</span>
+                        </button>
+                    </div>
+                    <hr class="debug-divider">
+                    <div>FRONT: <span id="db-front">---</span></div>
+                    <div>LEFT:  <span id="db-left">---</span></div>
+                    <div>RIGHT: <span id="db-right">---</span></div>
+                    <hr class="debug-divider">
+                    <div>THR RAW:   <span id="db-throttle-raw">0.00</span></div>
+                    <div>THR ADJ:   <span id="db-throttle-adjusted" style="color: #00ff88;">0.00</span></div>
+                    <div>SRV RAW:   <span id="db-servo-raw">0.00</span></div>
+                    <div>SRV ADJ:   <span id="db-servo-adjusted" style="color: #00ff88;">0.00</span></div>
+                </div>
             </div>
+            <div class="panel-tab" id="left-tab">&lt;</div>
         </div>
-
-        <div class="camera-container">
-           <img id="camera-feed" 
-                src="http://192.168.0.30:8080/stream?topic=/camera_node/image_raw&type=ros_compressed" 
-                alt="Live Camera Feed">
-        </div>
-
+        
         <div class="sensor-overlay">
             <svg class="radar-svg" viewBox="0 0 200 200">
                 <polygon id="cone-left" points="30,70 70,95 30,120" fill="rgba(0,255,136,0.3)" />
@@ -60,6 +55,45 @@
             <div class="radar-text" id="radar-readout">ALL CLEAR</div>
         </div>
 
+        <div class="status-card">
+            <div id="connection-status-container" class="connection-status">
+                <span id="connection-state">Checking...</span>
+                <span id="connection-metrics">(-- ms)</span>
+            </div>
+            <button id="shutdown-btn" class="shutdown-btn" title="Shutdown RC Car System">⏻</button>
+        </div>
+
+        <div id="right-panel" class="side-panel right-panel">
+            <div class="panel-tab" id="right-tab">&gt;</div>
+            
+            <div class="panel-content right-content">
+                <div class="control-box">
+                    <div class="box-title">Max Thrust Limit</div>
+                    <div class="speed-btn-group">
+                        <button class="speed-btn" data-speed="0.25">25%</button>
+                        <button class="speed-btn" data-speed="0.50">50%</button>
+                        <button class="speed-btn active" data-speed="1.00">100%</button>
+                    </div>
+                </div>
+
+                <div class="control-box">
+                    <div class="box-title">Live PID Tuning</div>
+                    <div class="pid-inputs">
+                        <label>Kp: <input type="number" id="pid-kp" value="1.0" step="0.1"></label>
+                        <label>Ki: <input type="number" id="pid-ki" value="0.0" step="0.1"></label>
+                        <label>Kd: <input type="number" id="pid-kd" value="0.5" step="0.1"></label>
+                        <button id="apply-pid-btn">APPLY UPDATE</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="camera-container">
+           <img id="camera-feed" 
+                src="http://192.168.0.30:8080/stream?topic=/camera_node/image_raw&type=ros_compressed" 
+                alt="Live Camera Feed">
+        </div>
+
         <div class="bottom-controls">
             <div class="steering-controls">
                 <button class="dir-btn" data-dir="left">◀</button>
@@ -70,14 +104,6 @@
                 <button class="thrust-btn reverse" data-thrust="reverse">⏬</button>
                 <button class="thrust-btn forward" data-thrust="forward">🚀</button>
             </div>
-        </div>
-
-        <div class="status-card">
-            <div id="connection-status-container" class="connection-status">
-                <span id="connection-state">Checking...</span>
-                <span id="connection-metrics">(-- ms)</span>
-            </div>
-            <button id="shutdown-btn" class="shutdown-btn" title="Shutdown RC Car System">⏻</button>
         </div>
     </div>
 

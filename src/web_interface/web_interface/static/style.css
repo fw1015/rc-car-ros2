@@ -27,51 +27,181 @@ html, body {
     padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* ==================== CAMERA ==================== */
-.camera-container {
+/* ==================== COLLAPSIBLE PANELS (FLEXBOX) ==================== */
+.side-panel {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-    background: #000;
+    z-index: 110;
+    display: flex;
+    align-items: flex-start;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
 }
 
-#camera-feed {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: block;
-}
-
-/* ==================== PROXIMITY WARNINGS ==================== */
-.warning-edge {
-    position: absolute;
-    z-index: 5; /* Keeps it under the UI */
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.1s ease-out; /* Faster, smoother pulsing */
-}
-#warning-top { 
-    top: 0; left: 0; right: 0; height: 12vh; /* Thinner */
-    background: linear-gradient(to bottom, rgba(255,0,0,0.5), transparent); 
-}
-#warning-left { 
-    top: 0; left: 0; bottom: 0; width: 8vw; /* Thinner */
-    background: linear-gradient(to right, rgba(255,0,0,0.5), transparent); 
-}
-#warning-right { 
-    top: 0; right: 0; bottom: 0; width: 8vw; /* Thinner */
-    background: linear-gradient(to left, rgba(255,0,0,0.5), transparent); 
-}
-
-/* ==================== DIAGNOSTIC TELEMETRY MODULE (TOP LEFT) ==================== */
-.debug-parameters-panel {
-    position: absolute;
+.left-panel {
     top: 15px;
-    left: 15px;
+    left: 0;
+    flex-direction: row; 
+}
+
+.left-panel.collapsed {
+    transform: translateX(calc(-100% + 24px));
+}
+
+.left-panel .panel-content {
+    margin-left: 15px; /* Replaces absolute positioning */
+}
+
+.right-panel {
+    top: 75px;
+    right: 0;
+    flex-direction: row;
+}
+
+.right-panel.collapsed {
+    transform: translateX(calc(100% - 24px));
+}
+
+.right-panel .panel-content {
+    margin-right: 15px;
+}
+
+.right-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.panel-content {
+    pointer-events: auto;
+}
+
+.debug-parameters-panel {
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+}
+
+.panel-tab {
+    width: 24px;
+    height: 48px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #00ff88;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    
+    /* UPDATE THESE FONT PROPERTIES */
+    font-family: monospace;
+    font-size: 20px;
+    font-weight: bold;
+    
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    backdrop-filter: blur(8px);
+    pointer-events: auto;
+    flex-shrink: 0;
+    margin-top: 10px;
+}
+
+#left-tab {
+    border-radius: 0 6px 6px 0;
+    border-left: none;
+}
+
+#right-tab {
+    border-radius: 6px 0 0 6px;
+    border-right: none;
+}
+
+/* ==================== RIGHT SIDE CONTROL STYLES ==================== */
+.control-box {
+    background: rgba(0, 0, 0, 0.75);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    font-family: monospace;
+    width: 180px; /* Forces both panels to be exactly the same width */
+    pointer-events: auto;
+    backdrop-filter: blur(8px);
+}
+
+.box-title {
+    color: #00ff88;
+    font-size: 12px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+/* Thrust Limits */
+.speed-btn-group {
+    display: flex;
+    gap: 5px;
+}
+
+.speed-btn {
+    flex: 1;
+    background: #333;
+    color: white;
+    border: 1px solid #666;
+    padding: 5px 0;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: 0.2s;
+}
+.speed-btn.active {
+    background: #00ff88;
+    color: black;
+    border-color: #00ff88;
+    font-weight: bold;
+}
+
+/* PID Inputs */
+.pid-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: white;
+    font-size: 12px;
+}
+
+.pid-inputs label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pid-inputs input {
+    width: 60px;
+    background: #222;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 3px;
+    text-align: right;
+    padding: 2px 5px;
+}
+
+#apply-pid-btn {
+    margin-top: 4px;
+    background: #333;
+    color: white;
+    border: 1px solid #666;
+    padding: 6px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: 0.2s;
+    font-family: monospace;
+    font-weight: bold;
+}
+
+#apply-pid-btn:hover {
+    background: #444;
+}
+
+/* ==================== TELEMETRY MODULE (TOP LEFT) ==================== */
+.debug-parameters-panel {
+    position: relative;
     z-index: 110;
     background: rgba(0, 0, 0, 0.75);
     padding: 10px 14px;
@@ -100,6 +230,56 @@ html, body {
     border: 0;
     border-top: 1px solid rgba(0,255,136,0.2);
     margin: 6px 0;
+}
+
+.record-control {
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: center;
+    pointer-events: auto; 
+}
+
+#record-btn {
+    background: #222;
+    color: #aaa;
+    border: 1px solid #444;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+#record-btn.recording {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: #ff4444;
+    color: #ff4444;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    background-color: #555;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+#record-btn.recording .dot {
+    background-color: #ff4444;
+    animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(255, 68, 68, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
 }
 
 /* ==================== RADAR VEHICLE MAP OVERLAY ==================== */
@@ -263,4 +443,47 @@ html, body {
 
 .shutdown-btn:active {
     transform: scale(0.95);
+}
+
+/* ==================== CAMERA ==================== */
+.camera-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background: #000;
+    pointer-events: none;
+}
+
+#camera-feed {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* ==================== PROXIMITY WARNINGS ==================== */
+.warning-edge {
+    position: absolute;
+    z-index: 5; /* Keeps it under the UI */
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease-out; /* Faster, smoother pulsing */
+}
+
+#warning-top { 
+    top: 0; left: 0; right: 0; height: 12vh; /* Thinner */
+    background: linear-gradient(to bottom, rgba(255,0,0,0.5), transparent); 
+}
+
+#warning-left { 
+    top: 0; left: 0; bottom: 0; width: 8vw; /* Thinner */
+    background: linear-gradient(to right, rgba(255,0,0,0.5), transparent); 
+}
+
+#warning-right { 
+    top: 0; right: 0; bottom: 0; width: 8vw; /* Thinner */
+    background: linear-gradient(to left, rgba(255,0,0,0.5), transparent); 
 }

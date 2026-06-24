@@ -23,7 +23,7 @@ An autonomous RC car built with **ROS 2 Jazzy**, **Raspberry Pi 5**, and a web-b
 ### Demo Video
 Watch the RC car being controlled in real-time via the web interface:
 
-[▶️ Watch Demo Video](https://github.com/fw1015/rc-car-ros2/releases/download/v1.0/RC_Control.mp4)
+[▶️ Watch Demo Video](https://github.com/fw1015/rc-car-ros2/releases/download/v1.0/RC.Control.mp4)
 
 ---
 

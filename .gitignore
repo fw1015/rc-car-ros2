@@ -1,43 +1,37 @@
-<<<<<<< HEAD
 # ROS 2 build files
 build/
 install/
 log/
-=======
-# ROS 2
-build/
-install/
-log/
 *.bag
->>>>>>> cd28538 (Initial commit: Full RC Car ROS2 project with clean structure)
 
 # Python
 __pycache__/
-*.pyc
-<<<<<<< HEAD
-*.pyo
-=======
->>>>>>> cd28538 (Initial commit: Full RC Car ROS2 project with clean structure)
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
 .venv/
+env/
+.env/
+*.egg-info/
+dist/
+*.egg
 
 # VS Code
 .vscode/
 
-<<<<<<< HEAD
-# Temporary files
+# Temporary / Debug files
 *.log
-*.bag
 *.csv
 debug_test_*.jpg
-*.png
-*.jpg
+*.tmp
 
 # System files
 .DS_Store
-=======
-# Temporary
-*.log
-*.csv
-debug_test_*.jpg
->>>>>>> cd28538 (Initial commit: Full RC Car ROS2 project with clean structure)
+Thumbs.db
+
+# Large media files (we use GitHub Releases instead)
+*.mp4
+*.mov
+*.avi

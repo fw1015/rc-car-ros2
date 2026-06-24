@@ -60,16 +60,14 @@ class RobotBrainNode(Node):
         self.get_logger().info('✅ Robot Brain Node started: Teleoperation & Safety active.')
 
     def front_dist_callback(self, msg: Float64):
-        """Updates the internal state and runs the single source of truth PID loop"""
+        """Updates the internal state and runs the PID loop at the sensor's native rate"""
         # Hardware Offset: Sensor is 22mm (0.022m) behind the physical front bumper
         self.front_distance = max(0.0, msg.data - 0.022)
 
-        # Execute the PID safety calculation strictly at the frame rate of the sensor
-        if self.last_raw_throttle > 0.0:
-            temp_msg = Twist()
-            temp_msg.linear.x = self.last_raw_throttle
-            self.sensor_control_adjust(temp_msg)
-
+        temp_msg = Twist()
+        temp_msg.linear.x = self.last_raw_throttle
+        self.sensor_control_adjust(temp_msg)
+            
     def move_cmd_callback(self, msg: Twist):
         """Processes incoming joystick commands and saves them to state memory"""
         self.last_cmd_time = self.get_clock().now()
@@ -83,6 +81,9 @@ class RobotBrainNode(Node):
             self.send_command(channel=2, value=msg.angular.z)
             self.last_steering = msg.angular.z
 
+        # RESTORED: Instantly trigger the motor dispatch so the web UI feels snappy
+        self.sensor_control_adjust(msg)
+
     def sensor_control_adjust(self, msg: Twist):
         """Dynamic Obstacle Avoidance: Enforces a 1.5-meter Deceleration Zone 
         where forward throttle is linearly clamped based on true bumper distance"""
@@ -94,28 +95,33 @@ class RobotBrainNode(Node):
             # 1. Calculate Time Delta (dt)
             current_time = self.get_clock().now()
             dt = (current_time - self.last_pid_time).nanoseconds / 1e9
-            if dt <= 0.0 or dt > 0.5:
-                self.last_pid_time = current_time
-                return # Prevent division by zero or massive spikes on first loop
-                
-            # 2. Calculate Errors
-            error = self.front_distance - self.target_distance
-            self.integral_error += error * dt
-            derivative = (error - self.last_error) / dt
             
-            # 3. PID Equation
+            # 2. Calculate Proportional Error
+            error = self.front_distance - self.target_distance
+            
+            # 3. TIME GUARD: Protect against double-triggers and stale start times
+            if 0.01 < dt < 0.5:
+                # Normal frame: Safe to calculate the derivative shock absorber
+                self.integral_error += error * dt
+                derivative = (error - self.last_error) / dt
+            else:
+                # Event happened too fast or car was parked for a long time. 
+                # Bypass the derivative math to prevent -1.0 spikes!
+                derivative = 0.0
+                
+            # 4. The PID Equation
             pid_output = (self.kp * error) + (self.ki * self.integral_error) + (self.kd * derivative)
             
+            # Update state for the next loop
+            self.last_error = error
+            self.last_pid_time = current_time
+
             # --- DEAD-BAND MOTOR COMFORT ZONE ---
             # If the car arrives within 3cm of the target, force a quiet rest state
             if abs(error) < 0.03:
                 pid_output = 0.0
                 self.integral_error = 0.0
             
-            # 4. Save state for the next loop
-            self.last_error = error
-            self.last_pid_time = current_time
-
             # 5. Determine the final throttle
             adjusted_throttle = min(user_throttle, pid_output)
             

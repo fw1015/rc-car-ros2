@@ -9,11 +9,23 @@ An autonomous RC car built with **ROS 2 Jazzy**, **Raspberry Pi 5**, and a web-b
 ## Features
 
 - **Real-time Web Control** — Control steering and throttle via browser (phone-friendly)
-- **Live Camera Streaming** — Stream video from Raspberry Pi Camera Module 3
+- **Live Camera Streaming** — Stream video from Raspberry Pi Camera Module 3 Wide
 - **Multi-Sensor System** — VL53L5CX (ToF) + dual HC-SR04 ultrasonic sensors
 - **Field Mode** — Built-in WiFi hotspot for outdoor operation (no home router needed)
 - **ROS2 Architecture** — Web Server Node, Brain Node, Sensors Node, Movement Node
 - **3D Printed Mounts** — Custom fixtures for Pi, camera, and sensors
+
+## Media & Demo
+
+### Hardware Assembly
+![RC Car Hardware Components](docs/images/rc-car-hardware-assembly.png)
+
+### Demo Video
+Watch the RC car being controlled in real-time via the web interface:
+
+[▶️ Watch Demo Video](https://github.com/fw1015/rc-car-ros2/releases/download/v1.0/RC_Control.mp4)
+
+---
 
 ## Tech Stack
 
@@ -29,24 +41,14 @@ An autonomous RC car built with **ROS 2 Jazzy**, **Raspberry Pi 5**, and a web-b
 rc-car-ros2/
 ├── src/
 │   ├── web_interface/            # Flask web server + frontend
-│   ├── robot_brain/              # Decision making & sensor fusion
+│   ├── robot_brain/              # Decision making & safety logic
 │   ├── robot_movement/           # Servo and ESC control nodes
 │   ├── robot_sensors/            # ToF + Ultrasonic sensor nodes
 │   └── camera_ros/               # Camera streaming node
-├── docs/                         # Documentation
+├── docs/
+│   ├── images/                   # Hardware photos and diagrams
 │   └── hardware_architecture.md  # Hardware mapping and pin connections
 ├── hardware/
 │   └── 3d_models/                # STL files for 3D printed parts
 ├── .gitignore
 └── README.md
-```
-
-## How to Run
-
-```bash
-cd ~/ros2_robot_ws
-source install/setup.bash
-
-# Run full system
-ros2 launch web_interface web_control.launch.py
-```
